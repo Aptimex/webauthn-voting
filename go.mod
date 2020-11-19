@@ -1,4 +1,4 @@
-module github.com/hbolimovsky/webauthn-example
+module github.com/Aptimex/webauthn_dual
 
 go 1.12
 
