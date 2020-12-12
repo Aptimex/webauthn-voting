@@ -13,6 +13,17 @@ https://stackoverflow.com/questions/27500861/whats-the-proper-way-to-go-get-a-pr
 
 `export GOPRIVATE=github.com/Aptimex`
 
+## Other useful stuff
+Copy a repo so you can make it private: https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/duplicating-a-repository
+
+Remove a package installed with `go get`: https://stackoverflow.com/questions/13792254/removing-packages-installed-with-go-get
+
+Deploy keys can only be used once; https://docs.github.com/en/free-pro-team@latest/developers/overview/managing-deploy-keys#deploy-keys and   https://unix.stackexchange.com/questions/322124/ssh-add-add-all-private-keys-in-ssh-directory
+- Would actually have to do this, which is more work than it's worth; just use site-wide key: https://gist.github.com/gubatron/d96594d982c5043be6d4
+
+To get replacement repo, use replace github.com/duo-labs/webauthn => github.com/Aptimex/webauthn master
+- Don't modify import names in any other files; this is functionally a global find+replace
+
 
 # WebAuthn Basic Client/Server Example (go)
 
