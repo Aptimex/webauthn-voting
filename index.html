@@ -16,6 +16,11 @@
   <br>
   <button onclick="registerUser()">Register</button>
   <button onclick="loginUser()">Login</button>
+  <button onClick="dumpDB()">Dump Database</button>
+  
+  <div id="dbDump">
+      
+  </div>
 
   <script>
 
@@ -27,6 +32,23 @@
         return;
       }
     });
+    
+    function dumpDB() {
+        $.get(
+            '/dump',
+            null,
+            function (data) {
+              return data
+            },
+            'json'
+            ).then((dump) => {
+                console.log(dump);
+                document.getElementById("dbDump").innerHTML = dump;
+            }).catch((error) => {
+              console.log(error)
+              alert("failed to dumo DB");
+            })
+    }
 
     // Base64 to ArrayBuffer
     function bufferDecode(value) {
