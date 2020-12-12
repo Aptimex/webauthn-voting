@@ -1,3 +1,19 @@
+# Setting Up
+In VMWare, go to VM->Settings->Options->Shared Folders. Disable, OK, Enable, OK. Link doesn't persist across reboots for some reason. 
+
+Use link to go to git/webauthn_dual. Then `go run .`
+
+## Access from Host
+To port forward (only needed once) go to Edit->Virtual Network Editor. Select NAT->NAT Settings->Add. Forward <IP>:8080 to a host port, where <IP> is the guest IP (`ip a`). Should now be accessible from host. 
+
+## Enable private repos for go get
+https://stackoverflow.com/questions/27500861/whats-the-proper-way-to-go-get-a-private-repository
+
+`git config --global url.git@github.com:.insteadOf https://github.com/`
+
+`export GOPRIVATE=github.com/Aptimex`
+
+
 # WebAuthn Basic Client/Server Example (go)
 
 This library implements a simple, basic WebAuthn client and server based on [duo's WebAuthn implementation](https://github.com/duo-labs/webauthn). The code pulls inspiration from [duo's WebAuthn example implementation](https://github.com/duo-labs/webauthn.io). This example is NOT meant to be used in production, but rather as an introduction to WebAuthn as well as a more quick-and-dirty, stripped down version of [webauthn.io](https://webauthn.io/).
