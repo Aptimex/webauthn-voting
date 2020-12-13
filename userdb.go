@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sync"
+	"encoding/json"
 )
 
 type userdb struct {
@@ -43,4 +44,16 @@ func (db *userdb) PutUser(user *User) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	db.users[user.name] = user
+}
+
+//Dump database info
+func (db *userdb) DumpDB() (string) {
+	result := "{"
+	for k, v := range db.users {
+		tmp, _ := json.Marshal(k)
+		result += string(tmp)  + ":"
+
+		result += v.json() + ","
+	}
+	return result[:len(result)-1] + "}"
 }

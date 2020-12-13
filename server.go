@@ -42,6 +42,8 @@ func main() {
 
 	r := mux.NewRouter()
 
+	r.HandleFunc("/dump", dbDump).Methods("GET")
+
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
 	r.HandleFunc("/login/begin/{username}", BeginLogin).Methods("GET")
@@ -51,6 +53,12 @@ func main() {
 
 	log.Println("starting server at", serverAddress)
 	log.Fatal(http.ListenAndServe(serverAddress, r))
+}
+
+func dbDump(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := userDB.DumpDB()
+	jsonResponse(w, data, http.StatusOK)
 }
 
 func BeginRegistration(w http.ResponseWriter, r *http.Request) {
