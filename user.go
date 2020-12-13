@@ -3,6 +3,11 @@ package main
 import (
 	"crypto/rand"
 	"encoding/binary"
+	
+	"encoding/base64"
+	"encoding/json"
+	"strconv"
+	"fmt"
 
 	"github.com/duo-labs/webauthn/protocol"
 	"github.com/duo-labs/webauthn/webauthn"
@@ -14,6 +19,50 @@ type User struct {
 	name        string
 	displayName string
 	credentials []webauthn.Credential
+}
+
+type UserPub struct {
+	Id          uint64
+	Name        string
+	DisplayName string
+	Credentials []webauthn.Credential
+}
+
+//JSON and other method can't interact with non-public fields
+func (u User) ToPub() UserPub {
+	var p UserPub
+	p.Id = u.id
+	p.Name = u.name
+	p.DisplayName = u.displayName
+	p.Credentials = u.credentials
+	return p
+}
+
+func (u User) json() string {
+	tmp, err := json.Marshal(u.ToPub())
+	if err != nil {
+		fmt.Println(err)
+		return "CRAP"
+	}
+	return string(tmp)
+	
+}
+
+func (u User) Print() string {
+	result := ""
+	result += "id: " + strconv.FormatUint(u.id, 10) + "\n"
+	result += "name: " + u.name + "\n"
+	result += "displayName: " + u.displayName + "\n"
+	result += "creds: "
+	
+	for _, v := range u.credentials  {
+		result += "[ID: " + base64.StdEncoding.EncodeToString(v.ID) + ", \n"
+		result += "PubKey: " + base64.StdEncoding.EncodeToString(v.PublicKey) + ", \n"
+		result += "Attestation Type: " + v.AttestationType + "]"
+		//Ignore Authenticator struct for now
+	}
+	//result += "\n"
+	return result
 }
 
 // NewUser creates and returns a new User

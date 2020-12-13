@@ -48,16 +48,12 @@ func (db *userdb) PutUser(user *User) {
 
 //Dump database info
 func (db *userdb) DumpDB() (string) {
-	tmp, err := json.Marshal(db)
-	if err != nil {
-		return "Marshal error"
-	}
-	return string(tmp)
-	/*
+	result := "{"
 	for k, v := range db.users {
-		data += k + " => " + v + "\n"
+		tmp, _ := json.Marshal(k)
+		result += string(tmp)  + ":"
+
+		result += v.json() + ","
 	}
-	*/
-	
-	//return data
+	return result[:len(result)-1] + "}"
 }

@@ -56,6 +56,7 @@ func main() {
 }
 
 func dbDump(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
 	data := userDB.DumpDB()
 	jsonResponse(w, data, http.StatusOK)
 }
