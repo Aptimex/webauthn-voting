@@ -7,6 +7,8 @@ contrib.go.opencensus.io/exporter/stackdriver v0.12.1/go.mod h1:iwB6wGarfphGGe/e
 contrib.go.opencensus.io/resource v0.1.1/go.mod h1:F361eGI91LCmW1I/Saf+rX0+OFcigGlFvXwEGEnkRLA=
 github.com/Aptimex/webauthn v0.0.0-20201212200631-74a63ef82099 h1:2XKQaRm1ewSisL83VluC4TjZsI6fyVS89/uAV4FG9W4=
 github.com/Aptimex/webauthn v0.0.0-20201212200631-74a63ef82099/go.mod h1:m0nBt6w0nOET+owpribku6Kz8KLvVlGpOZCOIGPvqgA=
+github.com/Aptimex/webauthn v0.0.0-20201213005217-b1579332688f h1:/6B8bJrKFNlImCuxZbWTluY118FGjkhP/KXs9DZZHqE=
+github.com/Aptimex/webauthn v0.0.0-20201213005217-b1579332688f/go.mod h1:m0nBt6w0nOET+owpribku6Kz8KLvVlGpOZCOIGPvqgA=
 github.com/Aptimex/webauthn.io v0.0.0-20201212214139-fa23fa916195 h1:o5PnqPMGvZ2JZWuUNqykOszSU+9DKSmNd2PamsDiRMg=
 github.com/Aptimex/webauthn.io v0.0.0-20201212214139-fa23fa916195/go.mod h1:FktIaPKvGPYqFki97qLWFIloOIp3JIX9ZVUM4Yq9oE4=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=

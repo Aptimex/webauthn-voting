@@ -71,6 +71,7 @@
         return;
       }
 
+      console.log("Begin Register");
       $.get(
         '/register/begin/' + username,
         null,
@@ -98,6 +99,7 @@
           let clientDataJSON = credential.response.clientDataJSON;
           let rawId = credential.rawId;
 
+          console.log("Finish Register");
           $.post(
             '/register/finish/' + username,
             JSON.stringify({
@@ -132,6 +134,7 @@
         return;
       }
 
+      console.log("Begin Login");
       $.get(
         '/login/begin/' + username,
         null,
@@ -158,6 +161,7 @@
           let sig = assertion.response.signature;
           let userHandle = assertion.response.userHandle;
 
+          console.log("Finish Login");
           $.post(
             '/login/finish/' + username,
             JSON.stringify({
@@ -182,7 +186,7 @@
         })
         .catch((error) => {
           console.log(error)
-          alert("failed to register " + username)
+          alert("failed to login as " + username)
         })
     }
 

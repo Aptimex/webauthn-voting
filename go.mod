@@ -2,9 +2,9 @@ module github.com/Aptimex/webauthn_dual
 
 go 1.12
 
-replace github.com/duo-labs/webauthn => github.com/Aptimex/webauthn v0.0.0-20201212200631-74a63ef82099
+replace github.com/duo-labs/webauthn => ../webauthn //github.com/Aptimex/webauthn master
 
-replace github.com/duo-labs/webauthn.io => github.com/Aptimex/webauthn.io v0.0.0-20201212214139-fa23fa916195
+replace github.com/duo-labs/webauthn.io => ../webauthn.io //github.com/Aptimex/webauthn.io master
 
 require (
 	github.com/duo-labs/webauthn v0.0.0-20191119193225-4bf9a0f776d4
