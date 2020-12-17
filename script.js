@@ -24,6 +24,95 @@ function dumpDB() {
         })
 }
 
+// mostly the same as beginLogin
+function verifyData() {
+
+  username = $("#email").val()
+  if (username === "") {
+    alert("Please enter a username");
+    return;
+  }
+
+  console.log("Begin verify");
+  $.get(
+    '/verify/begin/' + username,
+    null,
+    function (data) {
+      return data
+    },
+    'json')
+    .then((credentialRequestOptions) => {
+      console.log(credentialRequestOptions)
+      credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
+      
+      var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
+      console.log(challengeString);
+      
+      
+      credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
+        listItem.id = bufferDecode(listItem.id)
+      });
+
+      return navigator.credentials.get({
+        publicKey: credentialRequestOptions.publicKey
+      })
+    })
+    .then((assertion) => {
+      console.log(assertion)
+      let authData = assertion.response.authenticatorData;
+      let clientDataJSON = assertion.response.clientDataJSON;
+      let rawId = assertion.rawId;
+      let sig = assertion.response.signature;
+      let userHandle = assertion.response.userHandle;
+
+      console.log("Finish verify");
+      var veriData = "";
+      $.post(
+        '/verify/finish/' + username,
+        JSON.stringify({
+          id: assertion.id,
+          rawId: bufferEncode(rawId),
+          type: assertion.type,
+          response: {
+            authenticatorData: bufferEncode(authData),
+            clientDataJSON: bufferEncode(clientDataJSON),
+            signature: bufferEncode(sig),
+            userHandle: bufferEncode(userHandle),
+          },
+        }),
+        function (data) {
+            //console.log("Finish login data:");
+            //console.log(data);
+            return data
+        },
+        'json')
+        .then((data) => {
+            //alert("Verification Success for data: " + atob(data));
+            document.getElementById("verified").innerHTML = atob(data);
+            return data;
+        })
+        .catch((error) => {
+            document.getElementById("verified").style.color = "red";
+            document.getElementById("verified").innerHTML = "Verification Failed!";
+            console.log(error)
+            alert("failed to verify data for " + username)
+        })
+        
+    })
+    /* Pretty sure this is in the wrong spot; triggers even if /verify/finish fails
+    .then((success) => {
+        alert("Data verified for " + username + "!")
+        return
+    })
+    */
+    .catch((error) => {
+        document.getElementById("verified").style.color = "red";
+        document.getElementById("verified").innerHTML = "Verification Failed!";
+      console.log(error)
+      alert("failed to verify data for " + username)
+    })
+}
+
 // Base64 to ArrayBuffer
 function bufferDecode(value) {
   return Uint8Array.from(atob(value), c => c.charCodeAt(0));
@@ -119,6 +208,9 @@ function loginUser() {
     .then((credentialRequestOptions) => {
       console.log(credentialRequestOptions)
       credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
+      
+      console.log(credentialRequestOptions.publicKey.challenge);
+      
       credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
         listItem.id = bufferDecode(listItem.id)
       });
