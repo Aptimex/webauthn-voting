@@ -43,7 +43,7 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/dump", dbDump).Methods("GET")
-	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("GET")
+	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
@@ -69,6 +69,13 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	// get username
 	vars := mux.Vars(r)
 	username := vars["username"]
+	
+	var data string
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+	}
 
 	// get user
 	user, err := userDB.GetUser(username)
@@ -81,7 +88,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate PublicKeyCredentialRequestOptions, session data
-	options, sessionData, err := webAuthn.BeginVerify(user)
+	options, sessionData, err := webAuthn.BeginVerify(user, data)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)

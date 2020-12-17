@@ -24,7 +24,7 @@ function dumpDB() {
         })
 }
 
-// mostly the same as beginLogin
+// mostly the same as loginUser
 function verifyData() {
 
   username = $("#email").val()
@@ -32,11 +32,17 @@ function verifyData() {
     alert("Please enter a username");
     return;
   }
+  
+  var dataToVerify = $("#verifyMe").val();
+  if (dataToVerify === "") {
+    alert("Please enter data to verify");
+    return;
+  }
 
   console.log("Begin verify");
-  $.get(
+  $.post(
     '/verify/begin/' + username,
-    null,
+    JSON.stringify(dataToVerify),
     function (data) {
       return data
     },
