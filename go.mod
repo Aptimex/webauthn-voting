@@ -11,6 +11,7 @@ require (
 	github.com/duo-labs/webauthn.io v0.0.0-20190926134215-35f44a73518f
 	github.com/google/go-tpm v0.1.0 // indirect
 	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/sessions v1.2.0
 	github.com/jinzhu/gorm v1.9.11 // indirect
 	gopkg.in/square/go-jose.v2 v2.2.2 // indirect
 )

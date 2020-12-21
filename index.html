@@ -15,17 +15,26 @@
   <input type="text" name="username" id="email" placeholder="i.e. foo@bar.com">
   <br>
   <br>
+  
   <button onclick="registerUser()">Register</button>
   <button onclick="loginUser()">Login</button>
-  <button onclick="verifyData()">Verify</button>
-  <button onClick="dumpDB()">Dump Database</button>
+  <br>
+  <br>
+  
   <textarea name="verifyMy" id="verifyMe" rows="8" cols="80"></textarea>
+  <br>
+  <button onclick="verifyData()">Verify</button>
+  <br>
+  <br>
+  
+  <button onClick="dumpDB()">Dump Database</button>
   
   <p>Verified data:</p>
   <div>
       <pre id="verified" style="color:green"></pre>
   </div>
   
+  <p>Database dump:</p>
   <div>
       <pre id="dbDump"></pre>
   </div>

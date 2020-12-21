@@ -254,6 +254,7 @@ function loginUser() {
     })
     .then((success) => {
       alert("successfully logged in " + username + "!")
+      window.location.href = "./vote";
       return
     })
     .catch((error) => {
