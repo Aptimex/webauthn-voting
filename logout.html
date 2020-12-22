@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Logout</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+  <script src="script.js"></script>
+</head>
+
+<body>
+
+  <p>Succesfully logged out <b>{{.Username}}</b></p>
+  <p>Returning home in 3 seconds.</p>
+  <br>
+  <br>
+
+  <script>
+  setTimeout (function () {
+    window.location.replace("./")
+  }, 3*1000)
+  </script>
+</body>
+
+</html>

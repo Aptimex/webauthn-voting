@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"html/template"
 	"strings"
 	//"io"
 	"context"
-	"time"
+	//"time"
 
 	"github.com/duo-labs/webauthn.io/session"
 	"github.com/duo-labs/webauthn/protocol"
@@ -80,8 +81,26 @@ func CastBallot(w http.ResponseWriter, r *http.Request)  {
     }
 	*/
 	
+	session, err := sessionStore.GetWebauthnSession("authentication", r)
+	if err != nil {
+		log.Println(err)
+		errorResponse(w, "Cannnot retrieve webauthn session: " + err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	//retrieve the user from the session info
+	user, err := userDB.GetUserByID(session.GetUserID())
+	if err != nil {
+		errorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	username := user.name
+	
+	tmpl, err := template.ParseFiles("voteCast.html")
+	tmpl.Execute(w, struct {Username string}{username})
+	
 	//Auth success, send the file
-	http.ServeFile(w, r, "voteCast.html")
+	//http.ServeFile(w, r, "voteCast.html")
 }
 
 //mostly the same as BeginLogin
@@ -344,7 +363,7 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 		if session.Challenge == "" {
 			err = fmt.Errorf("Empty challenge; cannot verify login status")
 			log.Println(err)
-			jsonResponse(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		
@@ -366,7 +385,7 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 		//retrieve the user from the session info
 		user, err := userDB.GetUserByID(session.GetUserID())
 		if err != nil {
-			jsonResponse(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 			//r = r.WithContext(context.WithValue(r.Context(), "user", nil))
 		} else {
@@ -387,14 +406,25 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func Logout(w http.ResponseWriter, r *http.Request)  {
-	err := sessionStore.DeleteWebauthnSession("authentication", r, w)
+	username, err := GetUsername(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println(err)
 	}
 	
-	fmt.Fprintf(w, "Successfully logged out; redirecting to home")
-	time.Sleep(time.Duration(3)*time.Second)
-	http.Redirect(w, r, "/", http.StatusFound)
+	err = sessionStore.DeleteWebauthnSession("authentication", r, w)
+	if err != nil {
+		if err.Error() != "error unmarshalling data" { //this error is expected if no user is logged in
+			http.Error(w, "Cannot logout: " + err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	
+	//fmt.Fprintf(w, "Successfully logged out; redirecting to home")
+	//time.Sleep(time.Duration(3)*time.Second)
+	//http.Redirect(w, r, "/", http.StatusFound)
+	
+	tmpl, err := template.ParseFiles("logout.html")
+	tmpl.Execute(w, struct {Username string}{username})
 	
 	/*
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
@@ -423,6 +453,23 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 	
 	jsonResponse(w, "Logged out", http.StatusOK)
 	*/
+}
+
+//Returns the current user's username based on cookies in the request
+func GetUsername(r *http.Request) (string, error)  {
+	session, err := sessionStore.GetWebauthnSession("authentication", r)
+	if err != nil {
+		log.Println("GetUsername: error retrieving session: " + err.Error())
+		return "", err
+	}
+	
+	//retrieve the user from the session info
+	user, err := userDB.GetUserByID(session.GetUserID())
+	if err != nil {
+		log.Println("GetUsername: error retrieving user: " + err.Error())
+		return "", err
+	}
+	return user.name, nil
 }
 
 // from: https://github.com/duo-labs/webauthn.io/blob/3f03b482d21476f6b9fb82b2bf1458ff61a61d41/server/response.go#L15
