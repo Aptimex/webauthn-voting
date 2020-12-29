@@ -24,16 +24,40 @@ function dumpDB() {
         })
 }
 
+function castBallot() {
+    return verifyData();
+}
+
+function confirmData(challengeString) {
+    // https://www.pair.com/support/kb/how-to-use-jquery-to-generate-modal-pop-up-when-clicked/
+    
+    /*
+    //appends an "active" class to .popup and .popup-content
+    $(".popup-overlay, .popup-content").addClass("active");
+    $("#confirmBallotData").html(challengeString);
+    */
+    
+    //var msg = "Are you sure you want to submit the following ballot data?\n";
+    var msg = "The following ballot data was sent to the server and is about to be signed by your key. If it's correct, hit OK. Othewise, hit Cancel.\n\n";
+    msg += challengeString;
+    
+    if (confirm(msg)) {
+        return true;
+    }
+    return false;
+}
+
 // mostly the same as loginUser
 function verifyData() {
 
-  username = $("#email").val()
+  //username = $("#email").val()
+  username = $("#username").val().trim();
   if (username === "") {
     alert("Please enter a username");
     return;
   }
   
-  var dataToVerify = $("#verifyMe").val();
+  var dataToVerify = $("#verifyMe").val().trim();
   if (dataToVerify === "") {
     alert("Please enter data to verify");
     return;
@@ -53,6 +77,10 @@ function verifyData() {
       
       var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
       console.log(challengeString);
+      
+      if (confirmData(challengeString) == false) {
+          return null;
+      }
       
       
       credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
@@ -94,14 +122,15 @@ function verifyData() {
         'json')
         .then((data) => {
             //alert("Verification Success for data: " + atob(data));
-            document.getElementById("verified").innerHTML = atob(data);
+            document.getElementById("verified").style.color = "green";
+            document.getElementById("verified").innerHTML = "Data verified!\n" + atob(data);
             return data;
         })
         .catch((error) => {
             document.getElementById("verified").style.color = "red";
-            document.getElementById("verified").innerHTML = "Verification Failed!";
+            document.getElementById("verified").innerHTML = "Verification Failed! Probably an incorrect signature";
             console.log(error)
-            alert("failed to verify data for " + username)
+            //alert("failed to verify data for " + username)
         })
         
     })
@@ -113,9 +142,9 @@ function verifyData() {
     */
     .catch((error) => {
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Verification Failed!";
+        document.getElementById("verified").innerHTML = "Verification Failed! Probably user canceled, or other client-side issue";
       console.log(error)
-      alert("failed to verify data for " + username)
+      //alert("failed to verify data for " + username)
     })
 }
 

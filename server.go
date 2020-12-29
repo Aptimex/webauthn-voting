@@ -51,7 +51,7 @@ func main() {
 	r.HandleFunc("/logout", Logout).Methods("GET")
 	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
-	r.HandleFunc("/vote", LoginRequired(CastBallot)).Methods("GET")
+	r.HandleFunc("/vote", LoginRequired(CastBallotPage)).Methods("GET")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
@@ -70,16 +70,8 @@ func dbDump(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, data, http.StatusOK)
 }
 
-func CastBallot(w http.ResponseWriter, r *http.Request)  {
-	/*
-	session, _ := store.Get(r, "userAuth")
-	
-	// Check if user is authenticated
-    if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-        http.Error(w, "Forbidden", http.StatusForbidden)
-        return
-    }
-	*/
+func CastBallotPage(w http.ResponseWriter, r *http.Request)  {
+	//wrap this handler in the LoginRequired() hanlder
 	
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
 	if err != nil {
@@ -98,9 +90,6 @@ func CastBallot(w http.ResponseWriter, r *http.Request)  {
 	
 	tmpl, err := template.ParseFiles("voteCast.html")
 	tmpl.Execute(w, struct {Username string}{username})
-	
-	//Auth success, send the file
-	//http.ServeFile(w, r, "voteCast.html")
 }
 
 //mostly the same as BeginLogin
@@ -334,14 +323,6 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	// handle successful login
-	/*
-	session, _ := store.Get(r, "userAuth")
-	//Auth stuff already done above
-	session.Values["authenticated"] = true
-    session.Save(r, w)
-	*/
 	
 	jsonResponse(w, "Login Success", http.StatusOK)
 }
@@ -351,8 +332,6 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 // stored in the session cookie
 func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		
-		//session, _ := ws.store.Get(r, session.WebauthnSession)
 		// load the session data
 		session, err := sessionStore.GetWebauthnSession("authentication", r)
 		if err != nil {
@@ -366,21 +345,6 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		
-		
-		// Load the user from the database and store it in the request context
-		/*
-		if id, ok := session.Values["user_id"]; ok {
-			u, err := models.GetUser(id.(uint))
-			if err != nil {
-				r = r.WithContext(context.WithValue(r.Context(), "user", nil))
-			} else {
-				r = r.WithContext(context.WithValue(r.Context(), "user", u))
-			}
-		} else {
-			r = r.WithContext(context.WithValue(r.Context(), "user", nil))
-		}
-		*/
 		
 		//retrieve the user from the session info
 		user, err := userDB.GetUserByID(session.GetUserID())
@@ -398,10 +362,7 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 			next.ServeHTTP(w, r)
 			return
 		}
-		//http.Redirect(w, r, "/", http.StatusUnauthorized)
-		//jsonResponse(w, "Not logged in", http.StatusUnauthorized)
 		http.Error(w, "Not logged in", http.StatusUnauthorized)
-		//fmt.Fprint(w, "You are not logged in")
 	})
 }
 
@@ -419,40 +380,8 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 		}
 	}
 	
-	//fmt.Fprintf(w, "Successfully logged out; redirecting to home")
-	//time.Sleep(time.Duration(3)*time.Second)
-	//http.Redirect(w, r, "/", http.StatusFound)
-	
 	tmpl, err := template.ParseFiles("logout.html")
 	tmpl.Execute(w, struct {Username string}{username})
-	
-	/*
-	session, err := sessionStore.GetWebauthnSession("authentication", r)
-	if err != nil {
-		log.Println(err)
-		jsonResponse(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	*/
-	
-	
-	/*
-	session, _ := store.Get(r, "userAuth")
-
-    // Revoke users authentication
-    session.Values["authenticated"] = false
-    session.Save(r, w)
-	cookie := &http.Cookie{
-	    Name:   "userAuth",
-	    Value:  "",
-	    Path:   "/",
-	    MaxAge: -1,
-		Expires: time.Unix(0, 0),
-	}
-	http.SetCookie(w, cookie)
-	
-	jsonResponse(w, "Logged out", http.StatusOK)
-	*/
 }
 
 //Returns the current user's username based on cookies in the request
