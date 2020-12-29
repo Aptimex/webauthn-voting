@@ -170,7 +170,9 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// handle successful login
+	// handle successful data signing
+	
+	
 	jsonResponse(w, veriData, http.StatusOK)
 }
 
