@@ -11,6 +11,8 @@ import (
 	//"io"
 	"context"
 	//"time"
+	"io/ioutil"
+    "bytes"
 
 	"github.com/duo-labs/webauthn.io/session"
 	"github.com/duo-labs/webauthn/protocol"
@@ -21,6 +23,16 @@ import (
 var webAuthn *webauthn.WebAuthn
 var userDB *userdb
 var sessionStore *session.Store
+var pending *PendingBallots
+var cast *CastBallots
+
+//automatically runs when file is loaded
+func init() {
+    pending = &PendingBallots{}
+    cast = &CastBallots{}
+    pending.Ballots = make(map[*User]*Ballot)
+    cast.Ballots = make(map[*User]*Ballot)
+}
 
 func main() {
 
@@ -48,6 +60,8 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/dump", dbDump).Methods("GET")
+	r.HandleFunc("/dumpPending", pbDump).Methods("GET")
+	r.HandleFunc("/dumpCast", cbDump).Methods("GET")
 	r.HandleFunc("/logout", Logout).Methods("GET")
 	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
@@ -67,6 +81,18 @@ func main() {
 func dbDump(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
 	data := userDB.DumpDB()
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func pbDump(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := pending.DumpPending()
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func cbDump(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := cast.DumpCast()
 	jsonResponse(w, data, http.StatusOK)
 }
 
@@ -137,6 +163,24 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 
 //mostly the same as FinishLogin
 func FinishVerify(w http.ResponseWriter, r *http.Request) {
+	//https://stackoverflow.com/questions/39791021/how-to-read-multiple-times-from-same-io-reader
+	//https://medium.com/@xoen/golang-read-from-an-io-readwriter-without-loosing-its-content-2c6911805361
+	//make a copy of the body
+	bodyContent, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyContent))
+	
+	/* //https://stackoverflow.com/questions/50269322/how-to-copy-struct-and-dereference-all-pointers
+	rj, err := json.Marshal(r)
+	if err != nil {
+		log.Println(err)
+	}
+	
+	var rCopy *http.Request
+	err = json.Unmarshal(rj, rCopy)
+	if err != nil {
+		log.Println(err)
+	}
+	*/
 
 	// get username
 	vars := mux.Vars(r)
@@ -159,6 +203,8 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	//log.Println(r.Body)
 
 	// in an actual implementation, we should perform additional checks on
 	// the returned 'credential', i.e. check 'credential.Authenticator.CloneWarning'
@@ -169,9 +215,17 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	//log.Println(r.Body)
 
 	// handle successful data signing
-	
+	//store ballot as Pending
+	err = pending.AddBallot(user, veriData, ioutil.NopCloser(bytes.NewBuffer(bodyContent)) )
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	
 	jsonResponse(w, veriData, http.StatusOK)
 }

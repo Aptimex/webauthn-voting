@@ -24,6 +24,40 @@ function dumpDB() {
         })
 }
 
+function dumpPending() {
+    $.get(
+        '/dumpPending',
+        null,
+        function (data) {
+          return data
+        },
+        'json'
+        ).then((dump) => {
+            console.log(dump);
+            document.getElementById("pbDump").innerHTML = JSON.stringify(JSON.parse(dump),null,2);
+        }).catch((error) => {
+          console.log(error)
+          alert("failed to dump Pending ballots");
+        })
+}
+
+function dumpCast() {
+    $.get(
+        '/dumpCast',
+        null,
+        function (data) {
+          return data
+        },
+        'json'
+        ).then((dump) => {
+            console.log(dump);
+            document.getElementById("cbDump").innerHTML = JSON.stringify(JSON.parse(dump),null,2);
+        }).catch((error) => {
+          console.log(error)
+          alert("failed to dump Cast ballots");
+        })
+}
+
 function castBallot() {
     return verifyData();
 }
@@ -163,7 +197,8 @@ function bufferEncode(value) {
 
 function registerUser() {
 
-  username = $("#email").val()
+  //username = $("#email").val()
+  username = $("#username").val()
   if (username === "") {
     alert("Please enter a username");
     return;
@@ -226,7 +261,8 @@ function registerUser() {
 
 function loginUser() {
 
-  username = $("#email").val()
+  //username = $("#email").val()
+  username = $("#username").val()
   if (username === "") {
     alert("Please enter a username");
     return;

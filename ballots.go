@@ -2,50 +2,57 @@ package main
 
 import (
     "fmt"
-    "crypto/sha256"
+    "sync"
+    "encoding/json"
+    //"net/http"
+    "io"
+    
+    "github.com/duo-labs/webauthn/protocol" //for the ParsedAssertionResponse struct in assertion.go
 )
 
 type Ballot struct {
-    data        string
-    sig1        []byte
-    sig2        []byte
+    data        string //the "challenge" in WebAuthn terms
+    
+    //sigData contains Response and Raw objects of type ParsedAssertionResponse and CredentialAssertionResponse respectively
+    //Can run .Verify(storedChallenge string, relyingPartyID, relyingPartyOrigin string, verifyUser bool, credentialBytes []byte) on them
+    //see webauthn/protocol/assertion.go for details
+    sigData1    *protocol.ParsedCredentialAssertionData //initial submission
+    sigData2    *protocol.ParsedCredentialAssertionData //verification
 }
 
 type PendingBallots struct {
-	Ballots    map[*User]Ballot
+	Ballots    map[*User]*Ballot
     mu         sync.RWMutex
 }
 
 type CastBallots struct {
-    Ballots    map[*User]Ballot
+    Ballots    map[*User]*Ballot
     mu         sync.RWMutex
 }
 
-var pending PendingBallots
-var cast CastBallots
-
-//automatically runs when file is loaded
-func init() {
-    pending.Ballots = make(map[*User]Ballot)
-    cast.Ballots = make(map[*User]Ballot)
-}
-
 func CheckAlreadyVotedError(user *User) error {
-    if b, ok := pending.Ballots[user]; !ok {
+    if _, ok := pending.Ballots[user]; ok {
         return fmt.Errorf("Pending ballot already exists for user " + user.name)
     }
     
-    if b, ok := cast.Ballots[user]; !ok {
+    if _, ok := cast.Ballots[user]; ok {
         return fmt.Errorf("Cast ballot already exists for user " + user.name)
     }
     
     return nil
 }
 
-func (pb *PendingBallots) AddBallot(user *User, data string, sig []byte) (err error)  {
+func (pb *PendingBallots) AddBallot(user *User, data string, bodyContent io.Reader /*response *http.Request*/ /*sig *protocol.ParsedAssertionResponse*/) (err error)  {
     if user == nil {
         return fmt.Errorf("No user specified")
     }
+    
+    //store the parsedResponse with the ballot so its sig (on `data` as the challenge) can be verified any time
+    //parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
+    parsedResponse, err := protocol.ParseCredentialRequestResponseBody(bodyContent)
+	if err != nil {
+		return err
+	}
     
     //webauthn/protocol/assertion.go->Verify() and webauthn/protocol/webauthncose/webauthncose.go->VerifySignature()
     /*
@@ -73,19 +80,52 @@ func (pb *PendingBallots) AddBallot(user *User, data string, sig []byte) (err er
     }
     
 	pb.Ballots[user].data = data
-    pb.Ballots[user].sig1 = sig
-    pb.Ballots[user].sig2 = nil
+    pb.Ballots[user].sigData1 = parsedResponse
+    pb.Ballots[user].sigData2 = nil
     
     return nil
 }
 
-func (pb *PendingBallots) GetBallot(user *User) (b Ballot, err error)  {
+func (pb *PendingBallots) GetBallot(user *User) (b *Ballot, err error)  {
     pb.mu.Lock()
 	defer pb.mu.Unlock()
     
-    b, ok := pb.Ballots[user]
-    if ok {
+    if b, ok := pb.Ballots[user]; ok {
         return b, nil
     }
     return nil, fmt.Errorf("No pending ballot found for user " + user.name)
+}
+
+//Dump ballot info
+func (pb *PendingBallots) DumpPending() (string) {
+	result := "{"
+	for k, v := range pb.Ballots {
+		tmp, _ := json.Marshal(k)
+		result += string(tmp)  + ":"
+
+        tmp, _ = json.Marshal(v)
+		result += string(tmp) + ","
+	}
+	
+	if result == "{" {
+		return "{}"
+	}
+	return result[:len(result)-1] + "}"
+}
+
+//Dump ballot info
+func (cb *CastBallots) DumpCast() (string) {
+	result := "{"
+	for k, v := range cb.Ballots {
+		tmp, _ := json.Marshal(k)
+		result += string(tmp)  + ":"
+
+        tmp, _ = json.Marshal(v)
+		result += string(tmp) + ","
+	}
+	
+	if result == "{" {
+		return "{}"
+	}
+	return result[:len(result)-1] + "}"
 }
