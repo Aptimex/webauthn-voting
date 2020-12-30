@@ -34,7 +34,7 @@ function dumpPending() {
         'json'
         ).then((dump) => {
             console.log(dump);
-            document.getElementById("pbDump").innerHTML = JSON.stringify(JSON.parse(dump),null,2);
+            document.getElementById("pbDump").innerHTML = dump; //JSON.stringify(JSON.parse(dump),null,2);
         }).catch((error) => {
           console.log(error)
           alert("failed to dump Pending ballots");
@@ -51,7 +51,7 @@ function dumpCast() {
         'json'
         ).then((dump) => {
             console.log(dump);
-            document.getElementById("cbDump").innerHTML = JSON.stringify(JSON.parse(dump),null,2);
+            document.getElementById("cbDump").innerHTML = dump; //JSON.stringify(JSON.parse(dump),null,2);
         }).catch((error) => {
           console.log(error)
           alert("failed to dump Cast ballots");

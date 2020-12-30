@@ -11,8 +11,8 @@ import (
 	//"io"
 	"context"
 	//"time"
-	"io/ioutil"
-    "bytes"
+	//"io/ioutil"
+    //"bytes"
 
 	"github.com/duo-labs/webauthn.io/session"
 	"github.com/duo-labs/webauthn/protocol"
@@ -30,8 +30,8 @@ var cast *CastBallots
 func init() {
     pending = &PendingBallots{}
     cast = &CastBallots{}
-    pending.Ballots = make(map[*User]*Ballot)
-    cast.Ballots = make(map[*User]*Ballot)
+    pending.Ballots = make(map[*UserPub]*Ballot)
+    cast.Ballots = make(map[*UserPub]*Ballot)
 }
 
 func main() {
@@ -87,6 +87,7 @@ func dbDump(w http.ResponseWriter, r *http.Request) {
 func pbDump(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
 	data := pending.DumpPending()
+	log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
@@ -166,8 +167,10 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 	//https://stackoverflow.com/questions/39791021/how-to-read-multiple-times-from-same-io-reader
 	//https://medium.com/@xoen/golang-read-from-an-io-readwriter-without-loosing-its-content-2c6911805361
 	//make a copy of the body
+	/*
 	bodyContent, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyContent))
+	*/
 	
 	/* //https://stackoverflow.com/questions/50269322/how-to-copy-struct-and-dereference-all-pointers
 	rj, err := json.Marshal(r)
@@ -209,23 +212,29 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 	// in an actual implementation, we should perform additional checks on
 	// the returned 'credential', i.e. check 'credential.Authenticator.CloneWarning'
 	// and then increment the credentials counter
-	_, veriData, err := webAuthn.FinishVerify(user, sessionData, r)
+	_, veriData, parsedResponse, err := webAuthn.FinishVerify(user, sessionData, r)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if parsedResponse == nil {
+		log.Println("parsedResponse nil")
 	}
 	
 	//log.Println(r.Body)
 
 	// handle successful data signing
 	//store ballot as Pending
-	err = pending.AddBallot(user, veriData, ioutil.NopCloser(bytes.NewBuffer(bodyContent)) )
+	//err = pending.AddBallot(user, veriData, ioutil.NopCloser(bytes.NewBuffer(bodyContent)) )
+	
+	err = pending.AddBallot(user, veriData, parsedResponse)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
 	
 	jsonResponse(w, veriData, http.StatusOK)
 }
