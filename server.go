@@ -23,15 +23,15 @@ import (
 var webAuthn *webauthn.WebAuthn
 var userDB *userdb
 var sessionStore *session.Store
-var pending *PendingBallots
-var cast *CastBallots
+var ballots *BallotBox
+//var cast *CastBallots
 
 //automatically runs when file is loaded
 func init() {
-    pending = &PendingBallots{}
-    cast = &CastBallots{}
-    pending.Ballots = make(map[*UserPub]*Ballot)
-    cast.Ballots = make(map[*UserPub]*Ballot)
+    ballots = &BallotBox{}
+    //cast = &BallotBox{}
+    ballots.Ballots = make(map[*UserPub]*Ballot)
+    //cast.Ballots = make(map[*UserPub]*Ballot)
 }
 
 func main() {
@@ -60,8 +60,8 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/dump", dbDump).Methods("GET")
-	r.HandleFunc("/dumpPending", pbDump).Methods("GET")
-	r.HandleFunc("/dumpCast", cbDump).Methods("GET")
+	r.HandleFunc("/dumpPending", DumpPending).Methods("GET")
+	r.HandleFunc("/dumpCast", DumpCast).Methods("GET")
 	r.HandleFunc("/logout", Logout).Methods("GET")
 	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
@@ -84,16 +84,24 @@ func dbDump(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, data, http.StatusOK)
 }
 
-func pbDump(w http.ResponseWriter, r *http.Request) {
+func DumpPending(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
-	data := pending.DumpPending()
+	data := ballots.DumpPending()
 	log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
-func cbDump(w http.ResponseWriter, r *http.Request) {
+func DumpCast(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
-	data := cast.DumpCast()
+	data := ballots.DumpCast()
+	log.Println(data)
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func DumpError(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := ballots.DumpError()
+	log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
@@ -228,7 +236,7 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 	//store ballot as Pending
 	//err = pending.AddBallot(user, veriData, ioutil.NopCloser(bytes.NewBuffer(bodyContent)) )
 	
-	err = pending.AddBallot(user, veriData, parsedResponse)
+	err = ballots.AddBallot(user, veriData, parsedResponse)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)

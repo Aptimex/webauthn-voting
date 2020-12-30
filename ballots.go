@@ -5,11 +5,33 @@ import (
     "sync"
     "encoding/json"
     "log"
+    "bytes"
     //"net/http"
     //"io"
     
     "github.com/duo-labs/webauthn/protocol" //for the ParsedAssertionResponse struct in assertion.go
 )
+
+type BallotStatus int
+
+const (
+    BS_ERROR = iota
+    BS_PENDING
+    BS_VERIFIED
+    BS_VOID
+)
+
+var BStoString = map[BallotStatus]string {
+    BS_ERROR: "Ballot Error",
+    BS_PENDING: "Pending",
+    BS_VERIFIED: "Verified",
+    BS_VOID: "Ballot Voided",
+}
+
+func (bs BallotStatus) MarshalJSON() ([]byte, error)  {
+    buffer := bytes.NewBufferString(`"` + BStoString[bs] + `"`)
+	return buffer.Bytes(), nil
+}
 
 type Ballot struct {
     Data        string //the "challenge" in WebAuthn terms
@@ -19,101 +41,87 @@ type Ballot struct {
     //see webauthn/protocol/assertion.go for details
     SigData1    *protocol.ParsedCredentialAssertionData `json:"sig1"` //initial submission
     SigData2    *protocol.ParsedCredentialAssertionData `json:"sig2"` //verification
+    Status      BallotStatus
 }
 
-type PendingBallots struct {
+type BallotBox struct {
 	Ballots    map[*UserPub]*Ballot
     mu         sync.RWMutex
 }
 
-type CastBallots struct {
-    Ballots    map[*UserPub]*Ballot
-    mu         sync.RWMutex
-}
-
-func CheckAlreadyVotedError(user *UserPub) error {
-    if _, ok := pending.Ballots[user]; ok {
-        return fmt.Errorf("Pending ballot already exists for user " + user.Name)
+func (bb *BallotBox) AlreadyVoted(user *UserPub) (bool, error) {
+    for u, b := range bb.Ballots {
+        if u.Id == user.Id {
+            if b.Status == BS_VOID {
+                return true, fmt.Errorf("Voided ballot already exists for user " + user.Name)
+            }
+            
+            if b.Status == BS_ERROR {
+                return true, fmt.Errorf("Uninitialized or malformed ballot already exists for user " + user.Name)
+            } else if b.Status == BS_PENDING {
+                return true, fmt.Errorf("Pending Ballot already exists for user " + user.Name)
+            } else if b.Status == BS_VERIFIED {
+                return true, fmt.Errorf("Cast Ballot already exists for user " + user.Name)
+            } else {
+                return true, fmt.Errorf("Ballot in known state already exists for user " + user.Name)
+            }
+        }
     }
     
-    if _, ok := cast.Ballots[user]; ok {
-        return fmt.Errorf("Cast ballot already exists for user " + user.Name)
+    /*
+    if b, ok := bb.Ballots[user]; ok {
+        
     }
+    */
     
-    return nil
+    return false, nil
 }
 
-func (pb *PendingBallots) AddBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData /*response *http.Request*/ /*sig *protocol.ParsedAssertionResponse*/) (err error)  {
+func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
     user := u.ToPubPtr()
     
     if user == nil {
         return fmt.Errorf("No user specified")
     }
     
-    if pb == nil {
-        return fmt.Errorf("Pending ballots not initialized")
+    if bb == nil {
+        return fmt.Errorf("Ballot Box not initialized")
     }
-    //store the parsedResponse with the ballot so its sig (on `data` as the challenge) can be verified any time
-    //parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
-    /*
-    parsedResponse, err := protocol.ParseCredentialRequestResponseBody(bodyContent)
-	if err != nil {
-		return err
-	}
-    */
     
-    //webauthn/protocol/assertion.go->Verify() and webauthn/protocol/webauthncose/webauthncose.go->VerifySignature()
-    /*
-    // Step 15. Let hash be the result of computing a hash over the cData using SHA-256.
-	clientDataHash := sha256.Sum256(p.Raw.AssertionResponse.ClientDataJSON)
-
-	// Step 16. Using the credential public key looked up in step 3, verify that sig is
-	// a valid signature over the binary concatenation of authData and hash.
-
-	sigData := append(p.Raw.AssertionResponse.AuthenticatorData, clientDataHash[:]...)
-
-	key, err := webauthncose.ParsePublicKey(credentialBytes)
-
-	valid, err := webauthncose.VerifySignature(key, sigData, p.Response.Signature)
-	if !valid {
-		return ErrAssertionSignature.WithDetails(fmt.Sprintf("Error validating the assertion signature: %+v\n", err))
-	}
-	return nil
-    */
-    
-    pb.mu.Lock()
-	defer pb.mu.Unlock()
-    if err = CheckAlreadyVotedError(user); err != nil {
+    bb.mu.Lock()
+	defer bb.mu.Unlock()
+    if voted, err := bb.AlreadyVoted(user); voted {
         return err
     }
     
-    pb.Ballots[user] = &Ballot{}
-	pb.Ballots[user].Data = data
-    pb.Ballots[user].SigData1 = parsedResponse
-    pb.Ballots[user].SigData2 = nil
+    bb.Ballots[user] = &Ballot{}
+	bb.Ballots[user].Data = data
+    bb.Ballots[user].SigData1 = parsedResponse
+    bb.Ballots[user].SigData2 = nil
+    bb.Ballots[user].Status = BS_PENDING
     
     
     return nil
 }
 
-func (pb *PendingBallots) GetBallot(u *User) (b *Ballot, err error)  {
+func (bb *BallotBox) GetBallot(u *User) (b *Ballot, err error)  {
     user := u.ToPubPtr()
     
-    pb.mu.Lock()
-	defer pb.mu.Unlock()
+    bb.mu.Lock()
+	defer bb.mu.Unlock()
     
-    if b, ok := pb.Ballots[user]; ok {
+    if b, ok := bb.Ballots[user]; ok {
         return b, nil
     }
-    return nil, fmt.Errorf("No pending ballot found for user " + user.Name)
+    return nil, fmt.Errorf("No ballot found for user " + user.Name)
 }
 
 //Dump ballot info
-func (pb *PendingBallots) DumpPending() (string) {
-    log.Println(pb.Ballots)
+func (bb *BallotBox) DumpAll() (string) {
+    log.Println(bb.Ballots)
     
 	result := "{"
-	for k, v := range pb.Ballots {
+	for k, v := range bb.Ballots {
 		tmp, _ := json.MarshalIndent(k, "", "  ")
 		result += string(tmp)  + ":"
 
@@ -125,18 +133,63 @@ func (pb *PendingBallots) DumpPending() (string) {
 		return "{}"
 	}
 	return result[:len(result)-1] + "}"
-    
 }
 
-//Dump ballot info
-func (cb *CastBallots) DumpCast() (string) {
+//Dump pending ballots
+func (bb *BallotBox) DumpPending() (string) {
+    //log.Println(bb.Ballots)
+    
 	result := "{"
-	for k, v := range cb.Ballots {
-        tmp, _ := json.MarshalIndent(k, "", "  ")
-		result += string(tmp)  + ":"
+	for u, b := range bb.Ballots {
+        if b.Status == BS_PENDING {
+            tmp, _ := json.MarshalIndent(u, "", "  ")
+    		result += string(tmp)  + ":"
 
-        tmp, _ = json.MarshalIndent(v, "", "  ")
-		result += string(tmp) + ","
+            tmp, _ = json.MarshalIndent(b, "", "  ")
+    		result += string(tmp) + ","
+        }
+	}
+	
+	if result == "{" {
+		return "{}"
+	}
+	return result[:len(result)-1] + "}"
+}
+
+//Dump cast ballots
+func (bb *BallotBox) DumpCast() (string) {
+    //log.Println(bb.Ballots)
+    
+	result := "{"
+	for u, b := range bb.Ballots {
+        if b.Status == BS_VERIFIED {
+            tmp, _ := json.MarshalIndent(u, "", "  ")
+    		result += string(tmp)  + ":"
+
+            tmp, _ = json.MarshalIndent(b, "", "  ")
+    		result += string(tmp) + ","
+        }
+	}
+	
+	if result == "{" {
+		return "{}"
+	}
+	return result[:len(result)-1] + "}"
+}
+
+//Dump voided and erroneous ballots
+func (bb *BallotBox) DumpError() (string) {
+    //log.Println(bb.Ballots)
+    
+	result := "{"
+	for u, b := range bb.Ballots {
+        if b.Status == BS_ERROR || b.Status == BS_VOID {
+            tmp, _ := json.MarshalIndent(u, "", "  ")
+    		result += string(tmp)  + ":"
+
+            tmp, _ = json.MarshalIndent(b, "", "  ")
+    		result += string(tmp) + ","
+        }
 	}
 	
 	if result == "{" {

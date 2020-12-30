@@ -162,7 +162,8 @@ function verifyData() {
         })
         .catch((error) => {
             document.getElementById("verified").style.color = "red";
-            document.getElementById("verified").innerHTML = "Verification Failed! Probably an incorrect signature";
+            document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText;
+            //console.log(error.responseText)
             console.log(error)
             //alert("failed to verify data for " + username)
         })
@@ -176,7 +177,7 @@ function verifyData() {
     */
     .catch((error) => {
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Verification Failed! Probably user canceled, or other client-side issue";
+        document.getElementById("verified").innerHTML = "Verification Failed! " + error //Probably user canceled, or other client-side issue";
       console.log(error)
       //alert("failed to verify data for " + username)
     })
