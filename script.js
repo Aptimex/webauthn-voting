@@ -24,6 +24,23 @@ function dumpDB() {
         })
 }
 
+function dumpSessions() {
+    $.get(
+        '/dumpSessions',
+        null,
+        function (data) {
+          return data
+        },
+        'json'
+        ).then((dump) => {
+            console.log(dump);
+            document.getElementById("sessionsDump").innerHTML = dump;//JSON.stringify(JSON.parse(dump),null,2);
+        }).catch((error) => {
+          console.log(error)
+          alert("failed to dump sessions");
+        })
+}
+
 function dumpPending() {
     $.get(
         '/dumpPending',
@@ -62,6 +79,98 @@ function castBallot() {
     return verifyData();
 }
 
+function verifyBallot() {
+    username = $("#username").val().trim();
+    if (username === "") {
+      alert("Please enter a username");
+      return;
+    }
+    
+    var dataToVerify = $("#verifyMe").html().trim();
+    if (dataToVerify === "") {
+      alert("Please enter data to verify");
+      return;
+    }
+
+    console.log("Begin Verify");
+    $.post(
+      '/verify/begin/' + username,
+      JSON.stringify(dataToVerify),
+      function (data) {
+        return data
+      },
+      'json')
+      .then((credentialRequestOptions) => {
+        console.log(credentialRequestOptions)
+        credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
+        
+        var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
+        console.log(challengeString);
+        
+        if (confirmData(challengeString) == false) {
+            return null;
+        }
+        
+        
+        credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
+          listItem.id = bufferDecode(listItem.id)
+        });
+
+        return navigator.credentials.get({
+          publicKey: credentialRequestOptions.publicKey
+        })
+      })
+      .then((assertion) => {
+        console.log(assertion)
+        let authData = assertion.response.authenticatorData;
+        let clientDataJSON = assertion.response.clientDataJSON;
+        let rawId = assertion.rawId;
+        let sig = assertion.response.signature;
+        let userHandle = assertion.response.userHandle;
+
+        console.log("Finish Verify");
+        var veriData = "";
+        $.post(
+          '/verify/finish/' + username,
+          JSON.stringify({
+            id: assertion.id,
+            rawId: bufferEncode(rawId),
+            type: assertion.type,
+            response: {
+              authenticatorData: bufferEncode(authData),
+              clientDataJSON: bufferEncode(clientDataJSON),
+              signature: bufferEncode(sig),
+              userHandle: bufferEncode(userHandle),
+            },
+          }),
+          function (data) {
+              //console.log("Finish login data:");
+              //console.log(data);
+              return data
+          },
+          'json')
+          .then((data) => {
+              //alert("Verification Success for data: " + atob(data));
+              document.getElementById("verified").style.color = "green";
+              document.getElementById("verified").innerHTML = "Data verified!\n" + atob(data);
+              return data;
+          })
+          .catch((error) => {
+              document.getElementById("verified").style.color = "red";
+              document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText;
+              //console.log(error.responseText)
+              console.log(error)
+              //alert("failed to verify data for " + username)
+          })
+          
+      })
+      .catch((error) => {
+          document.getElementById("verified").style.color = "red";
+          document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText
+        console.log(error)
+      })
+}
+
 function confirmData(challengeString) {
     // https://www.pair.com/support/kb/how-to-use-jquery-to-generate-modal-pop-up-when-clicked/
     
@@ -97,9 +206,9 @@ function verifyData() {
     return;
   }
 
-  console.log("Begin verify");
+  console.log("Begin Cast");
   $.post(
-    '/verify/begin/' + username,
+    '/cast/begin/' + username,
     JSON.stringify(dataToVerify),
     function (data) {
       return data
@@ -133,10 +242,10 @@ function verifyData() {
       let sig = assertion.response.signature;
       let userHandle = assertion.response.userHandle;
 
-      console.log("Finish verify");
+      console.log("Finish Cast");
       var veriData = "";
       $.post(
-        '/verify/finish/' + username,
+        '/cast/finish/' + username,
         JSON.stringify({
           id: assertion.id,
           rawId: bufferEncode(rawId),
@@ -251,7 +360,8 @@ function registerUser() {
         'json')
     })
     .then((success) => {
-      alert("successfully registered " + username + "!")
+      //alert("successfully registered " + username + "!")
+      $("#feedback").html("successfully registered " + username + "!");
       return
     })
     .catch((error) => {
@@ -319,12 +429,12 @@ function loginUser() {
         'json')
     })
     .then((success) => {
-      alert("successfully logged in " + username + "!")
+      //alert("successfully logged in " + username + "!")
       window.location.href = "./vote";
       return
     })
     .catch((error) => {
-      console.log(error)
+      console.log(error);
       alert("failed to login as " + username)
     })
 }

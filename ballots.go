@@ -100,6 +100,43 @@ func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.Pa
     bb.Ballots[user].SigData2 = nil
     bb.Ballots[user].Status = BS_PENDING
     
+    return nil
+}
+
+func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
+    user := bb.GetUserPub(u)
+    
+    if user == nil {
+        return fmt.Errorf("No user specified, or no ballot found for user")
+    }
+    
+    if bb == nil {
+        return fmt.Errorf("Ballot Box not initialized")
+    }
+    
+    log.Println("Getting ballot")
+    //Make sure ballot is in Pending status
+	pending, err := bb.GetBallot(u)
+	if err != nil {
+		return err
+	}
+    
+    log.Println("Checking Status")
+    if pending.Status != BS_PENDING {
+        status, _ := json.Marshal(pending.Status)
+		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
+		return err
+	}
+    
+    //pending.SigData2 = parsedResponse
+    //pending.Status = BS_VERIFIED
+    
+    bb.mu.Lock()
+	defer bb.mu.Unlock()
+    
+    log.Println("Setting verified")
+    bb.Ballots[user].SigData2 = parsedResponse
+    bb.Ballots[user].Status = BS_VERIFIED
     
     return nil
 }
@@ -110,9 +147,12 @@ func (bb *BallotBox) GetBallot(u *User) (b *Ballot, err error)  {
     bb.mu.Lock()
 	defer bb.mu.Unlock()
     
-    if b, ok := bb.Ballots[user]; ok {
-        return b, nil
+    for usr, b := range bb.Ballots {
+        if usr.Id == user.Id {
+            return b, nil
+        }
     }
+    
     return nil, fmt.Errorf("No ballot found for user " + user.Name)
 }
 
@@ -196,4 +236,16 @@ func (bb *BallotBox) DumpError() (string) {
 		return "{}"
 	}
 	return result[:len(result)-1] + "}"
+}
+
+func (bb *BallotBox) GetUserPub(u *User) *UserPub {
+    bb.mu.Lock()
+	defer bb.mu.Unlock()
+    
+    for usr, _ := range bb.Ballots {
+        if usr.Id == u.id {
+            return usr
+        }
+    }
+    return nil
 }

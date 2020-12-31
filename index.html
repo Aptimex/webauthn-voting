@@ -16,6 +16,11 @@
   <br>
   <br>
   
+  Feedback
+  <div id="feedback">
+      
+  </div>
+  
   <button onclick="registerUser()">Register</button>
   <button onclick="loginUser()">Login</button>
   <br>
@@ -27,17 +32,24 @@
   <br>
   <br>
   
-  <button onClick="dumpDB()">Dump Database</button>
   
   <p>Verified data:</p>
   <div>
       <pre id="verified" style="color:green"></pre>
   </div>
   
+  <button onClick="dumpDB()">Dump Database</button>
+  <button onClick="dumpSessions()">Dump Sessions</button>
   <p>Database dump:</p>
   <div>
       <pre id="dbDump"></pre>
   </div>
+  
+  <p>Sessions dump:</p>
+  <div>
+      <pre id="sessionsDump"></pre>
+  </div>
+  
   
   <button onclick="dumpPending()">Dump Pending Ballots</button>
   <button onclick="dumpCast()">Dump Cast Ballots</button>
