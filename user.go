@@ -25,7 +25,7 @@ type UserPub struct {
 	Id          uint64
 	Name        string
 	DisplayName string
-	Credentials []webauthn.Credential
+	Credentials []webauthn.Credential `json:"creds"`
 }
 
 //JSON and other method can't interact with non-public fields
@@ -36,6 +36,26 @@ func (u User) ToPub() UserPub {
 	p.DisplayName = u.displayName
 	p.Credentials = u.credentials
 	return p
+}
+
+func (u User) ToPubPtr() *UserPub {
+	tmp := u.ToPub()
+	return &tmp
+}
+
+
+func (u UserPub) ToPriv() User {
+	var p User
+	p.id = u.Id
+	p.name = u.Name
+	p.displayName = u.DisplayName
+	p.credentials = u.Credentials
+	return p
+}
+
+func (u UserPub) ToPrivPtr() *User {
+	tmp := u.ToPriv()
+	return &tmp
 }
 
 func (u User) json() string {

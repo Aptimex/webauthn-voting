@@ -11,6 +11,9 @@ import (
 	//"io"
 	"context"
 	//"time"
+	//"io/ioutil"
+    //"bytes"
+	//b64 "encoding/base64"
 
 	"github.com/duo-labs/webauthn.io/session"
 	"github.com/duo-labs/webauthn/protocol"
@@ -21,6 +24,16 @@ import (
 var webAuthn *webauthn.WebAuthn
 var userDB *userdb
 var sessionStore *session.Store
+var ballots *BallotBox
+//var cast *CastBallots
+
+//automatically runs when file is loaded
+func init() {
+    ballots = &BallotBox{}
+    //cast = &BallotBox{}
+    ballots.Ballots = make(map[*UserPub]*Ballot)
+    //cast.Ballots = make(map[*UserPub]*Ballot)
+}
 
 func main() {
 
@@ -48,10 +61,16 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/dump", dbDump).Methods("GET")
+	r.HandleFunc("/dumpSessions", DumpSessions).Methods("GET")
+	r.HandleFunc("/dumpPending", DumpPending).Methods("GET")
+	r.HandleFunc("/dumpCast", DumpCast).Methods("GET")
 	r.HandleFunc("/logout", Logout).Methods("GET")
+	r.HandleFunc("/cast/begin/{username}", BeginCast).Methods("POST")
+	r.HandleFunc("/cast/finish/{username}", FinishCast).Methods("POST")
 	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
 	r.HandleFunc("/vote", LoginRequired(CastBallotPage)).Methods("GET")
+	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
@@ -67,6 +86,33 @@ func main() {
 func dbDump(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
 	data := userDB.DumpDB()
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func DumpSessions(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := "Not implemented yet"
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func DumpPending(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := ballots.DumpPending()
+	log.Println(data)
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func DumpCast(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := ballots.DumpCast()
+	log.Println(data)
+	jsonResponse(w, data, http.StatusOK)
+}
+
+func DumpError(w http.ResponseWriter, r *http.Request) {
+	//log.Printf("%+v\n", userDB.users)
+	data := ballots.DumpError()
+	log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
@@ -92,8 +138,47 @@ func CastBallotPage(w http.ResponseWriter, r *http.Request)  {
 	tmpl.Execute(w, struct {Username string}{username})
 }
 
+func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
+	//wrap this handler in the LoginRequired() hanlder
+	
+	session, err := sessionStore.GetWebauthnSession("authentication", r)
+	if err != nil {
+		log.Println(err)
+		errorResponse(w, "Cannnot retrieve webauthn session: " + err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	//retrieve the user from the session info
+	user, err := userDB.GetUserByID(session.GetUserID())
+	if err != nil {
+		errorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	username := user.name
+	
+	//Retrieve the store ballot data to verify
+	pending, err := ballots.GetBallot(user)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if pending.Status != BS_PENDING {
+		status, _ := json.Marshal(pending.Status)
+		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	pendingData := pending.Data
+	
+	tmpl, err := template.ParseFiles("voteVerify.html")
+	tmpl.Execute(w, struct {Username string; BallotData string}{username, pendingData})
+}
+
 //mostly the same as BeginLogin
-func BeginVerify(w http.ResponseWriter, r *http.Request) {
+func BeginCast(w http.ResponseWriter, r *http.Request) {
 
 	// get username
 	vars := mux.Vars(r)
@@ -117,7 +202,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate PublicKeyCredentialRequestOptions, session data
-	options, sessionData, err := webAuthn.BeginVerify(user, data)
+	options, sessionData, err := webAuthn.BeginCast(user, data)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)
@@ -136,8 +221,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 //mostly the same as FinishLogin
-func FinishVerify(w http.ResponseWriter, r *http.Request) {
-
+func FinishCast(w http.ResponseWriter, r *http.Request) {
 	// get username
 	vars := mux.Vars(r)
 	username := vars["username"]
@@ -159,18 +243,139 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
 
-	// in an actual implementation, we should perform additional checks on
-	// the returned 'credential', i.e. check 'credential.Authenticator.CloneWarning'
-	// and then increment the credentials counter
-	_, veriData, err := webAuthn.FinishVerify(user, sessionData, r)
+	_, veriData, parsedResponse, err := webAuthn.FinishCast(user, sessionData, r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	err = ballots.AddBallot(user, veriData, parsedResponse)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	
+	jsonResponse(w, veriData, http.StatusOK)
+}
+
+//Verify cast ballot in separate session
+func BeginVerify(w http.ResponseWriter, r *http.Request) {
+	
+	// get username
+	vars := mux.Vars(r)
+	username := vars["username"]
+	
+	var data string
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+	}
+
+	// get user
+	user, err := userDB.GetUser(username)
+
+	// user doesn't exist
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	//Compare to previous ballot data
+	pending, err := ballots.GetBallot(user)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if pending.Status != BS_PENDING {
+		status, _ := json.Marshal(pending.Status)
+		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	pendingData := pending.Data
+	
+	if data != pendingData {
+		err = fmt.Errorf("Verification data does not match pending data: \nvData: " + data + "\npData: " + pendingData)
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// generate PublicKeyCredentialRequestOptions, session data
+	options, sessionData, err := webAuthn.BeginVerify(user, data)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// store session data as marshaled JSON
+	err = sessionStore.SaveWebauthnSession("authentication", sessionData, r, w)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, options, http.StatusOK)
+}
+
+//Verify cast ballot in separate session
+func FinishVerify(w http.ResponseWriter, r *http.Request) {
+	// get username
+	vars := mux.Vars(r)
+	username := vars["username"]
+
+	// get user
+	user, err := userDB.GetUser(username)
+
+	// user doesn't exist
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// handle successful login
+	// load the session data
+	sessionData, err := sessionStore.GetWebauthnSession("authentication", r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+
+	//Data match was performed in the BeginVerify function
+	//This just makes sure it's a valid sig on that data
+	log.Println("Verifying sig")
+	_, veriData, parsedResponse, err := webAuthn.FinishVerify(user, sessionData, r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	//store the second sig and mark as verified
+	log.Println("Verifying ballot")
+	err = ballots.VerifyBallot(user, veriData, parsedResponse)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	
 	jsonResponse(w, veriData, http.StatusOK)
 }
 
