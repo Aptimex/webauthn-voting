@@ -152,12 +152,12 @@ function verifyBallot() {
           .then((data) => {
               //alert("Verification Success for data: " + atob(data));
               document.getElementById("verified").style.color = "green";
-              document.getElementById("verified").innerHTML = "Data verified!\n" + atob(data);
+              document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
               return data;
           })
           .catch((error) => {
               document.getElementById("verified").style.color = "red";
-              document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText;
+              document.getElementById("verified").innerHTML = "Ballot verification failed: " + error.responseText;
               //console.log(error.responseText)
               console.log(error)
               //alert("failed to verify data for " + username)
@@ -166,7 +166,7 @@ function verifyBallot() {
       })
       .catch((error) => {
           document.getElementById("verified").style.color = "red";
-          document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText
+          document.getElementById("verified").innerHTML = "Ballot verification failed:  " + error.responseText
         console.log(error)
       })
 }
@@ -266,12 +266,12 @@ function verifyData() {
         .then((data) => {
             //alert("Verification Success for data: " + atob(data));
             document.getElementById("verified").style.color = "green";
-            document.getElementById("verified").innerHTML = "Data verified!\n" + atob(data);
+            document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
             return data;
         })
         .catch((error) => {
             document.getElementById("verified").style.color = "red";
-            document.getElementById("verified").innerHTML = "Verification Failed! " + error.responseText;
+            document.getElementById("verified").innerHTML = "Ballot cast failed: " + error.responseText;
             //console.log(error.responseText)
             console.log(error)
             //alert("failed to verify data for " + username)
@@ -286,7 +286,7 @@ function verifyData() {
     */
     .catch((error) => {
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Verification Failed! " + error //Probably user canceled, or other client-side issue";
+        document.getElementById("verified").innerHTML = "Ballot cast failed: " + error //Probably user canceled, or other client-side issue";
       console.log(error)
       //alert("failed to verify data for " + username)
     })
