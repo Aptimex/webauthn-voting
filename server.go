@@ -71,6 +71,7 @@ func main() {
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
 	r.HandleFunc("/vote", LoginRequired(CastBallotPage)).Methods("GET")
 	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
+	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
@@ -589,8 +590,49 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 	tmpl.Execute(w, struct {Username string}{username})
 }
 
+func VoidBallot(w http.ResponseWriter, r *http.Request)  {
+	user, err := GetUser(r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	err = ballots.VoidBallot(user)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	jsonResponse(w, "Ballot voided for user " + user.name, http.StatusOK)
+}
+
+//Returns the current user's username based on cookies in the request
+func GetUser(r *http.Request) (*User, error)  {
+	session, err := sessionStore.GetWebauthnSession("authentication", r)
+	if err != nil {
+		log.Println("GetUser: error retrieving session: " + err.Error())
+		return nil, err
+	}
+	
+	//retrieve the user from the session info
+	user, err := userDB.GetUserByID(session.GetUserID())
+	if err != nil {
+		log.Println("GetUser: error retrieving user: " + err.Error())
+		return nil, err
+	}
+	return user, nil
+}
+
 //Returns the current user's username based on cookies in the request
 func GetUsername(r *http.Request) (string, error)  {
+	user, err := GetUser(r)
+	if err != nil {
+		return "", err
+	}
+	
+	/*
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
 	if err != nil {
 		log.Println("GetUsername: error retrieving session: " + err.Error())
@@ -603,6 +645,7 @@ func GetUsername(r *http.Request) (string, error)  {
 		log.Println("GetUsername: error retrieving user: " + err.Error())
 		return "", err
 	}
+	*/
 	return user.name, nil
 }
 

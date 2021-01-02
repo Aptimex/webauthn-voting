@@ -7,6 +7,27 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
   <script src="script.js"></script>
   
+  <script type="text/javascript">
+  $(document).ready(function () {
+      //verification being attemped on same device as manipulation; keep up appearances
+      var origData = getCookie("origData");
+      if (origData != "") {
+          $("#verifyMe").html(btoa(origData));
+      }
+      
+      //convert to ascii for convenience
+      var ballotData = $("#verifyMe").html();
+      $("#decoded").html(atob(ballotData));
+  });
+  </script>
+  
+  <style media="screen">
+      #verifyMe, #decoded {
+          background-color: lightgrey;
+          max-width: 500px;
+      }
+  </style>
+  
   <!-- link rel="stylesheet" href="modal.css" -->
 </head>
 
@@ -17,8 +38,14 @@
   <br>
   <br>
   
+  <p>Ballot data:</p>
   <div id="verifyMe">{{.BallotData}}</div>
+  
+  <p>Decoded data:</p>
+  <div id="decoded"></div>
+  <br>
   <button onclick="verifyBallot()">Verify Ballot</button>
+  <button onclick="voidBallot()">VOID Ballot</button>
   
   <p>Feedback</p>
   <div>

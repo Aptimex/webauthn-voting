@@ -75,11 +75,52 @@ function dumpCast() {
         })
 }
 
-function castBallot() {
-    return verifyData();
+function castBallot(modify=false, badSign=false) {
+    return verifyData(modify, badSign);
+}
+
+function voidBallot() {
+    /*
+    username = $("#username").val()
+    if (username === "") {
+      alert("Please enter a username");
+      return;
+    }
+    */
+
+    console.log("Begin Void");
+    $.get(
+      '/void',
+      null,
+      function (response) {
+        return response
+      },
+      'json')
+      .then((response) => {
+          document.getElementById("verified").style.color = "red";
+          document.getElementById("verified").innerHTML = "Ballot succesfully VOIDED:  " + response;
+      })
+      .catch((error) => {
+          document.getElementById("verified").style.color = "red";
+          document.getElementById("verified").innerHTML = "Issue voiding ballot:  " + error.responseText;
+        console.log(error)
+      })
 }
 
 function verifyBallot() {
+    var modify = false;
+    
+    //verification being attemped on same device as manipulation; keep up appearances
+    var badData = getCookie("badData");
+    var origData = getCookie("origData");
+    if (origData != "" && badData != "") {
+        modify = true;
+        
+        //need them in base64 for this stage
+        badData = btoa(badData).replace("=", ""); //backend uses/expects no padding
+        origData = btoa(origData).replace("=", "");
+    }
+    
     username = $("#username").val().trim();
     if (username === "") {
       alert("Please enter a username");
@@ -90,6 +131,10 @@ function verifyBallot() {
     if (dataToVerify === "") {
       alert("Please enter data to verify");
       return;
+    }
+    
+    if (modify) {
+        dataToVerify = badData;
     }
 
     console.log("Begin Verify");
@@ -107,8 +152,14 @@ function verifyBallot() {
         var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
         console.log(challengeString);
         
-        if (confirmData(challengeString) == false) {
-            return null;
+        if (modify) { //false display of original intended data
+            if (confirmData(origData) == false) {
+                return null;
+            }
+        } else {
+            if (confirmData(challengeString) == false) {
+                return null;
+            }
         }
         
         
@@ -152,7 +203,11 @@ function verifyBallot() {
           .then((data) => {
               //alert("Verification Success for data: " + atob(data));
               document.getElementById("verified").style.color = "green";
-              document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
+              if (modify) {
+                  document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(origData);
+              } else {
+                  document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
+              }
               return data;
           })
           .catch((error) => {
@@ -191,7 +246,10 @@ function confirmData(challengeString) {
 }
 
 // mostly the same as loginUser
-function verifyData() {
+function verifyData(modify=false, badSign=false) {
+  var badData = "Manipulated ballot data";
+  //save to cookie so verification on other pages can be manipulated too
+  document.cookie = "badData=" + badData;
 
   //username = $("#email").val()
   username = $("#username").val().trim();
@@ -204,6 +262,12 @@ function verifyData() {
   if (dataToVerify === "") {
     alert("Please enter data to verify");
     return;
+  }
+  var origData = dataToVerify;
+  document.cookie = "origData=" + origData;
+  
+  if (modify) {
+    dataToVerify = badData;
   }
 
   console.log("Begin Cast");
@@ -221,8 +285,14 @@ function verifyData() {
       var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
       console.log(challengeString);
       
-      if (confirmData(challengeString) == false) {
-          return null;
+      if (modify) { //false display of original intended data
+          if (confirmData(origData) == false) {
+              return null;
+          }
+      } else {
+          if (confirmData(challengeString) == false) {
+              return null;
+          }
       }
       
       
@@ -264,9 +334,12 @@ function verifyData() {
         },
         'json')
         .then((data) => {
-            //alert("Verification Success for data: " + atob(data));
             document.getElementById("verified").style.color = "green";
-            document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
+            if (modify) {
+                document.getElementById("verified").innerHTML = "Ballot Cast!\n" + origData;
+            } else {
+                document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
+            }
             return data;
         })
         .catch((error) => {
@@ -437,4 +510,12 @@ function loginUser() {
       console.log(error);
       alert("failed to login as " + username)
     })
+}
+
+//https://stackoverflow.com/questions/10730362/get-cookie-by-name
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return "";
 }

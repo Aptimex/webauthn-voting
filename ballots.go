@@ -104,24 +104,23 @@ func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.Pa
 }
 
 func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
-    user := bb.GetUserPub(u)
-    
-    if user == nil {
-        return fmt.Errorf("No user specified, or no ballot found for user")
-    }
-    
     if bb == nil {
         return fmt.Errorf("Ballot Box not initialized")
     }
     
-    log.Println("Getting ballot")
+    user := bb.GetUserPub(u)
+    if user == nil {
+        return fmt.Errorf("No user specified, or no ballot found for user")
+    }
+    
+    //log.Println("Getting ballot")
     //Make sure ballot is in Pending status
 	pending, err := bb.GetBallot(u)
 	if err != nil {
 		return err
 	}
     
-    log.Println("Checking Status")
+    //log.Println("Checking Status")
     if pending.Status != BS_PENDING {
         status, _ := json.Marshal(pending.Status)
 		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
@@ -134,7 +133,7 @@ func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol
     bb.mu.Lock()
 	defer bb.mu.Unlock()
     
-    log.Println("Setting verified")
+    //log.Println("Setting verified")
     bb.Ballots[user].SigData2 = parsedResponse
     bb.Ballots[user].Status = BS_VERIFIED
     
@@ -154,6 +153,30 @@ func (bb *BallotBox) GetBallot(u *User) (b *Ballot, err error)  {
     }
     
     return nil, fmt.Errorf("No ballot found for user " + user.Name)
+}
+
+func (bb *BallotBox) VoidBallot(u *User) (err error)  {
+    user :=  bb.GetUserPub(u)
+    if user == nil {
+        return fmt.Errorf("No user specified, or no ballot found for user")
+    }
+    
+    b, err := bb.GetBallot(u)
+    if err != nil {
+        return err
+    }
+    
+    //can't void after already verified; follow standard provisional voting procedure to override if needed
+    if b.Status == BS_VERIFIED {
+        return fmt.Errorf("Cannot void, ballot is already verified")
+    }
+    
+    bb.mu.Lock()
+	defer bb.mu.Unlock()
+    bb.Ballots[user].Status = BS_VOID
+    
+    return nil
+    
 }
 
 //Dump ballot info
