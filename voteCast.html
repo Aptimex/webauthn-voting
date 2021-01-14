@@ -6,37 +6,71 @@
   <title>Cast a Ballot</title>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
   <script src="script.js"></script>
+  <link rel="stylesheet" href="style.css">
   
   <!-- link rel="stylesheet" href="modal.css" -->
 </head>
 
 <body>
+    <h1>Cast Vote</h1>
+    
+    <div id="logout_div" style="display:none;"><button type="button" name="logout_btn" onClick='location.href="./logout"'>Logout</button> </div>
+    <br>
+    <br>
 
   Username: <input disabled="1" type="text" name="username" id="username" value="{{.Username}}">
   <!--b id="username">{{.Username}}</b -->
   <br>
   <br>
   
-  <textarea name="verifyMe" id="verifyMe" rows="8" cols="80"></textarea>
-  <button onclick="castBallot()">Cast Ballot</button>
-  <button onclick="castBallot(true)">Simulate covert ballot manipulation</button>
+  <div class="hide_me_div">
+	<a class="hide_me" href="javascript:void(0)">Page Info</a>
+    
+    <p>For simplicity, the "ballot" here is just a text box to demonstrate that arbitrary data can be used. Any necessary data validation for real ballots should be performed server-side. In this example the server will accept anything. </p>
+    <p>The Cast Ballot button sends a request to the server containing the data in the text box. The server will generate a standard webauthn credentialRequestOptions object (used for logins) and return it to the client, except that the Challenge will contain the (validated) submitted data instead of randomized bytes.
+    
+    The browser will display this challenge to the voter (so they can verify it wasn't altered during transmission) and then prompt for security key use which will sign that request just like a standard login procedure. If the challenge has been modifed the voter will know that something is amiss and seek alternative voting methods.
+    
+    When the server receives the signed response, it validates it just like a standard webauthn login response. If the validation passes, it stores the entire response as the user's submitted ballot and marks it as pending, waiting for verification.
+    </p>
+    <p>The 'Simulate covert ballot manipulation' button shows how local malware could alter the voter's ballot without the voter noticing. It intercepts the initial outgoing request to the server and alters the ballot data to whatever the attacker wants, in this case the fixed string "Manipulated ballot data". For the rest of the submission process it intercepts all messages displayed to the user and replaces that string with the original data the user supplied, resulting in a manipulated ballot submission that the voter cannot detect (at this stage).
+        
+    For simplicity it tracks this information in malicious cookies, but real advanced malware could employ much more discrete methods. This illustrates the worst-case scenario where the voter cannot trust their own computer to do what it appears to be doing.
+    </p>
+    
+  </div>
+  <br>
+  <br>
   
-  <p>Feedback</p>
+  <textarea name="verifyMe" id="verifyMe" rows="8" cols="80"></textarea>
+  <br> <button onclick="castBallot()">Cast Ballot</button>
+  <br> <button onclick="castBallot(true)">Simulate covert ballot manipulation</button>
+  <br>
+  <br>
+  
+  <p>[Errors and Feedback]</p>
   <div>
       <pre id="verified"></pre>
   </div>
+  <br>
+  <br>
   
-  <button onclick="dumpPending()">Dump Pending Ballots</button>
-  <button onclick="dumpCast()">Dump Cast Ballots</button>
   
-  <p>Pending ballots dump:</p>
-  <div>
-      <pre id="pbDump"></pre>
-  </div>
-  
-  <p>Cast ballots dump:</p>
-  <div>
-      <pre id="cbDump"></pre>
+  <div class="hide_me_div">
+	  <a class="hide_me" href="javascript:void(0)">Debug Stuff ▼</a>
+      
+      <button onclick="dumpPending()">Dump Pending Ballots</button>
+      <button onclick="dumpCast()">Dump Cast Ballots</button>
+      
+      <p>Pending ballots dump:</p>
+      <div>
+          <pre id="pbDump"></pre>
+      </div>
+      
+      <p>Cast ballots dump:</p>
+      <div>
+          <pre id="cbDump"></pre>
+      </div>
   </div>
 </body>
 

@@ -530,7 +530,20 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	jsonResponse(w, "Login Success", http.StatusOK)
+	//Retrieve the user's ballot data to decide which redirect to use
+	ballot, err := ballots.GetBallot(user)
+	if err != nil {
+		jsonResponse(w, "", http.StatusOK) //no ballot found
+		return
+	}
+	
+	if ballot.Status == BS_PENDING {
+		jsonResponse(w, "Pending", http.StatusOK) //pending ballot, send to verify
+		return
+	}
+	
+	//some other status, default to cast
+	jsonResponse(w, "", http.StatusOK)
 }
 
 //modified from webauthn.io source code

@@ -6,9 +6,15 @@
   <title>WebAuthn Demo</title>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
   <script src="script.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <h1>Registration and Login</h1>
+    
+    <div id="logout_div" style="display:none;"><button type="button" name="logout_btn" onClick='location.href="./logout"'>Logout</button> </div>
+    <br>
+    <br>
 
   Username:
   <br>
@@ -16,53 +22,75 @@
   <br>
   <br>
   
-  Feedback
+  <div class="hide_me_div">
+	<a class="hide_me" href="javascript:void(0)">Page Info</a>
+    
+    <p>This page provides a Register button for convenience. In reality, registration of voters' security keys should be performed securely prior to the availability of electronic ballot submissions. Attacks at the registration stage are outside the scope of this project. For simplicity this uses a passwordless authentication scheme, but using both (password and security key together; 2FA) is probably a better apprach in a real system.</p>
+    <p>"Username" can be in any form the server is set up to handle. In a voting scheme where voter privacy needs to be maintained, this could be a random numeric code (chosen from a pool). The username (and an associated random registration password) could be digitally marked as "avaiable" at the time of voter regiration, but not digitally linked to the voter's identity. This would allow the voter to register their key to that username, ensure only validated voters can register keys, and preserve voter privacy. </p>
+    <p>The Login button will (after a standard webauthn login process) redirect to the voting page. If a pending ballot for the voter is already in the system, it will instead redirect to the Verification page for convenience.</p>
+    <p>Debug functionality at the bottom allows the various internal databases to be viewed to show things are working as intended.</p>
+    
+  </div>
+  <br>
+  <br>
+  
+  [Errors and Feedback]
   <div id="feedback">
       
   </div>
+  <br>
+  <br>
   
   <button onclick="registerUser()">Register</button>
   <button onclick="loginUser()">Login</button>
   <br>
   <br>
   
-  <textarea name="verifyMy" id="verifyMe" rows="8" cols="80"></textarea>
-  <br>
-  <button onclick="verifyData()">Verify</button>
-  <br>
-  <br>
   
   
-  <p>Verified data:</p>
-  <div>
-      <pre id="verified" style="color:green"></pre>
-  </div>
-  
-  <button onClick="dumpDB()">Dump Database</button>
-  <button onClick="dumpSessions()">Dump Sessions</button>
-  <p>Database dump:</p>
-  <div>
-      <pre id="dbDump"></pre>
-  </div>
-  
-  <p>Sessions dump:</p>
-  <div>
-      <pre id="sessionsDump"></pre>
-  </div>
-  
-  
-  <button onclick="dumpPending()">Dump Pending Ballots</button>
-  <button onclick="dumpCast()">Dump Cast Ballots</button>
-  
-  <p>Pending ballots dump:</p>
-  <div>
-      <pre id="pbDump"></pre>
-  </div>
-  
-  <p>Cast ballots dump:</p>
-  <div>
-      <pre id="cbDump"></pre>
-  </div>
+  <div class="hide_me_div">
+	<a class="hide_me" href="javascript:void(0)">Debug Stuff ▼</a>
+    <br>
+    <br>
+    
+    <textarea name="verifyMy" id="verifyMe" rows="8" cols="80"></textarea>
+    <br>
+    <button onclick="verifyData()">Verify</button>
+    <br>
+    <br>
+    
+    
+    <p>Verified data:</p>
+    <div>
+        <pre id="verified" style="color:green"></pre>
+    </div>
+    
+    <button onClick="dumpDB()">Dump Database</button>
+    <button onClick="dumpSessions()">Dump Sessions</button>
+    <p>Database dump:</p>
+    <div>
+        <pre id="dbDump"></pre>
+    </div>
+    
+    <p>Sessions dump:</p>
+    <div>
+        <pre id="sessionsDump"></pre>
+    </div>
+    
+    
+    <button onclick="dumpPending()">Dump Pending Ballots</button>
+    <button onclick="dumpCast()">Dump Cast Ballots</button>
+    
+    <p>Pending ballots dump:</p>
+    <div>
+        <pre id="pbDump"></pre>
+    </div>
+    
+    <p>Cast ballots dump:</p>
+    <div>
+        <pre id="cbDump"></pre>
+    </div>
+</div>
 
   <script>
   </script>

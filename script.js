@@ -5,7 +5,28 @@ $(document).ready(function () {
     alert("Error: this browser does not support WebAuthn");
     return;
   }
+  
+  //Initialize hidden elements
+  $(".hide_me").siblings().hide();
+  
+  //Function to hide/unhide sections on click
+  $(".hide_me").click(function() {
+  	var el = this;
+
+  	if( $(el).siblings().css("display") ==  "none") {
+  		$(el).siblings().show("medium");
+  	}
+  	else {
+  		$(el).siblings().hide("medium");
+  	}
+  });
+  
+  if (getCookie("webauthn-session") != "") { //show logout button when relevant
+      $("#logout_div").show();
+  }
 });
+
+
 
 function dumpDB() {
     $.get(
@@ -249,7 +270,9 @@ function confirmData(challengeString) {
 function verifyData(modify=false, badSign=false) {
   var badData = "Manipulated ballot data";
   //save to cookie so verification on other pages can be manipulated too
-  document.cookie = "badData=" + badData;
+  if (modify) {
+    document.cookie = "badData=" + badData;
+  }
 
   //username = $("#email").val()
   username = $("#username").val().trim();
@@ -264,7 +287,9 @@ function verifyData(modify=false, badSign=false) {
     return;
   }
   var origData = dataToVerify;
-  document.cookie = "origData=" + origData;
+  if (modify) {
+    document.cookie = "origData=" + origData;
+  }
   
   if (modify) {
     dataToVerify = badData;
@@ -500,11 +525,19 @@ function loginUser() {
           return data
         },
         'json')
+        .then((success) => {
+            console.log(success);
+            if (success == "Pending") {
+                window.location.href = "./verify";
+            } else {
+                window.location.href = "./vote";
+            }
+            return
+        })
     })
     .then((success) => {
       //alert("successfully logged in " + username + "!")
-      window.location.href = "./vote";
-      return
+      
     })
     .catch((error) => {
       console.log(error);

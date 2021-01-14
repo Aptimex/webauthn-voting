@@ -1,0 +1,12 @@
+.hide_me {
+	color: black;
+	text-decoration: underline;
+	background-color: whitesmoke;
+	padding: 5px;
+}
+
+.hide_me_div {
+	background-color: whitesmoke;
+	border: 2px solid black;
+	padding: 5px;
+}
