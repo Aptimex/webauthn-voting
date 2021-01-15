@@ -24,7 +24,7 @@
   <br>
   
   <div class="hide_me_div">
-	<a class="hide_me" href="javascript:void(0)">Page Info</a>
+	<a class="hide_me" href="javascript:void(0)">Page Info ▼</a>
     
     <p>For simplicity, the "ballot" here is just a text box to demonstrate that arbitrary data can be used. Any necessary data validation for real ballots should be performed server-side. In this example the server will accept anything. </p>
     <p>The Cast Ballot button sends a request to the server containing the data in the text box. The server will generate a standard webauthn credentialRequestOptions object (used for logins) and return it to the client, except that the Challenge will contain the (validated) submitted data instead of randomized bytes.
