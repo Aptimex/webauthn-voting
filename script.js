@@ -459,12 +459,15 @@ function registerUser() {
     })
     .then((success) => {
       //alert("successfully registered " + username + "!")
+      $("#feedback").css("color","green");
       $("#feedback").html("successfully registered " + username + "!");
       return
     })
     .catch((error) => {
       console.log(error)
-      alert("failed to register " + username)
+      //alert("failed to register " + username)
+      $("#feedback").css("color","red");
+      $("#feedback").html("Failed to register " + username + "; " + error);
     })
 }
 

@@ -19,6 +19,17 @@
       //convert to ascii for convenience
       var ballotData = $("#verifyMe").html();
       $("#decoded").html(atob(ballotData));
+      
+      
+      //emulate auto-verification attempt for "Manipulated ballot data"
+      var urlParams = new URLSearchParams(window.location.search);
+      var auto = urlParams.has('auto');
+      var decoded = $("#decoded").html();
+      if (auto && decoded == "Manipulated ballot data") {
+          verifyBallot();
+          //also don't let the user void it
+          $("#void_btn").attr("onClick","verifyBallot()");
+      }
   });
   </script>
   
@@ -46,12 +57,12 @@
   <div class="hide_me_div">
 	<a class="hide_me" href="javascript:void(0)">Page Info ▼</a>
     
-    <p>For error resistance, ballot data is base64 encoded, and that base64(ballot) is the challenge that is signed by the security key. For convenience this page displays the signed base64 data and its decoded represenation. In a real implemenation this process should use the decoded data directly to avoid voter confusion. It would also be necessary to append random bytes to the ballot data to prevent replay attacks, but using the base64(base64(ballot)) as the vericiation challenge is functionally equivalent here. </p>
     <p>In practice this step should only be available via a dedicated smartphone application rather than via a web browser. This will make it much more difficult for attackers to implant effective local malware on both devices used by the voter. </p>
+    <p>For error resistance, ballot data is base64 encoded, and that base64(ballot) is the challenge that is signed by the security key. For convenience this page displays the signed base64 data and its decoded represenation. In a real implemenation this process should use the decoded data directly to avoid voter confusion. It would also be necessary to append random bytes to the ballot data to prevent replay attacks, but using the base64(base64(ballot)) as the vericiation challenge is functionally equivalent here. </p>
     <p>The Verify Ballot button does much the same thing as the Cast Ballot button on the previous page- sends the ballot data to the server, gets a webauthn object response containing the ballot data as the challenge, and uses that object to ask the voter's security key for a signature (displaying messages to ensure the voter can catch obvious manipulations). When the server receives and validates this second signature it saves this alongside the first as part of the voter's ballot, and marks the ballot as verified. At this point the server considers the ballot to be fully submitted and will include it in official tallies, and both signatures are auditable.</p>
     <p>If the voter selected the 'Simulate covert ballot manipulation' button on the previous page, and then navigates to this page on the same device (read: using the same web session) then things will work a little differently. The local device "malware" will alter both ballot data fields (which would normally display the manipulated ballot data) to instead display the original data the voter submitted. It will also manipulate any other messages displaying that ballot data in a similar manner. This illustrates the importance of performing ballot verification on a separate device where the same malware is not likely to be present, so the discrepency in ballot data will not be covered up. Using the same web session for verification could also be analygous to having malware on separate devices communicating in real time, which is outside the scope of this project's threat model. </p>
     <p>The VOID Ballot button allows the voter to immediately discard their vote (if it hasn't already been fully verified) and prevent any other electronic vote from being cast or verified with their credentials. The voter should use this if there is a discrepency between their original vote and what is displayed for verification, as it indicates local malware attempting to manipulate their vote (or a major server error). The voter should then alternative voting methods.</p>
-    <p>Note that using a security key for verification is necessary to prevent the following attack: a malware author creates a simple cross-platform malware that can modify votes cast in a web browser, but cannot communicate that data to the malware on the mobile device due to the more restrictive mobile OS environment. The simple mobile malware would only need to automcatically verify any ballot with a desireable vote, bypassing the user's interaction. In this case any covert manipulations by the browser malware would be validated before the user could stop it at the verification stage. By requiring user interaction with a security key, the malware cannot auto-verify desirable votes; it also cannot know whether a desirable vote was the user's actual intention, or the result of a malware manipulation that should be covered up. With a 50/50 chance of guessing correctly (baring a targetted attack against a voter with a known stance), such attacks would be quickly discovered AND mitigatable at discovery with a security key involved, vs only discoverable after the damage is done. </p>
+    <p>Note that using a security key for verification is necessary to prevent the following attack: a malware author creates a simple cross-platform malware that can modify votes cast in a web browser, but cannot communicate that data to the malware on the mobile device due to the more restrictive mobile OS environment. The simple mobile malware would only need to automcatically verify any ballot with a desireable vote, bypassing the user's interaction. In this case any covert manipulations by the browser malware would be validated before the user could stop it at the verification stage. By requiring user interaction with a security key, the malware cannot auto-verify desirable votes; it also cannot know whether a desirable vote was the user's actual intention, or the result of a malware manipulation that should be covered up. With a 50/50 chance of guessing correctly (baring a targetted attack against a voter with a known stance), such attacks would be quickly discovered AND mitigatable at discovery with a security key involved, vs only discoverable after the damage is done. To see this attack and mitigation in action, add '?auto=1' to this page URL after using the 'Covert ballot manipulation' button on the Cast Vote page (in a separate browser instance)</p>
     <p>Finally, not that security key involvement is necessary at submission and veriication (rather than just at login) to mitigate malware that simply hijacks the sessions after login. </p>
     
   </div>
@@ -65,7 +76,7 @@
   <div id="decoded"></div>
   <br>
   <button onclick="verifyBallot()">Verify Ballot</button>
-  <button onclick="voidBallot()">VOID Ballot</button>
+  <button id="void_btn" onclick="voidBallot()">VOID Ballot</button>
   <br>
   <br>
   

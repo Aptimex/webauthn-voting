@@ -594,7 +594,12 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 	err = sessionStore.DeleteWebauthnSession("authentication", r, w)
 	if err != nil {
 		if err.Error() != "error unmarshalling data" { //this error is expected if no user is logged in
-			http.Error(w, "Cannot logout: " + err.Error(), http.StatusInternalServerError)
+			cookie := http.Cookie{
+				Name: "webauthn-session",
+				MaxAge: -1,
+			}
+			http.SetCookie(w, &cookie)
+			http.Error(w, "Logout issue: " + err.Error(), http.StatusInternalServerError + "; Local session cookie deleted anyway")
 			return
 		}
 	}
