@@ -21,12 +21,36 @@ $(document).ready(function () {
   	}
   });
   
-  if (getCookie("webauthn-session") != "") { //show logout button when relevant
+  //show logout button when relevant
+  if (getCookie("webauthn-session") != "") {
       $("#logout_div").show();
+  }
+  
+  
+  //Update ballot status peridoically if relevant
+  if ($("#ballot_status").length) {
+      pollStatus();
   }
 });
 
-
+function pollStatus() {
+    //alert("test");
+    $.get(
+        '/status',
+        null,
+        function (data) {
+          return data
+        },
+        'json'
+    ).then((status) => {
+            $("#ballot_status").html(status);
+        }).catch((error) => {
+          //console.log(error)
+          //alert("failed to get ballot status");
+        })
+    
+    setTimeout(pollStatus, 5000);
+}
 
 function dumpDB() {
     $.get(

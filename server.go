@@ -72,6 +72,7 @@ func main() {
 	r.HandleFunc("/vote", LoginRequired(CastBallotPage)).Methods("GET")
 	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
 	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
+	r.HandleFunc("/status", LoginRequired(Status)).Methods("GET")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
@@ -165,6 +166,7 @@ func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
 		return
 	}
 	
+	/* Ballot status added to page, so can still display it even if verified/voided/etc
 	if pending.Status != BS_PENDING {
 		status, _ := json.Marshal(pending.Status)
 		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
@@ -172,10 +174,28 @@ func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	*/
 	pendingData := pending.Data
 	
 	tmpl, err := template.ParseFiles("voteVerify.html")
 	tmpl.Execute(w, struct {Username string; BallotData string}{username, pendingData})
+}
+
+func Status(w http.ResponseWriter, r *http.Request)  {
+	user, err := GetUser(r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	ballot, err := ballots.GetBallot(user)
+	if err != nil { //only thrown if no ballot found
+		jsonResponse(w, err.Error(), http.StatusOK)
+		return
+	}
+	
+	jsonResponse(w, ballot.Status, http.StatusOK)
 }
 
 //mostly the same as BeginLogin
@@ -599,7 +619,7 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 				MaxAge: -1,
 			}
 			http.SetCookie(w, &cookie)
-			http.Error(w, "Logout issue: " + err.Error(), http.StatusInternalServerError + "; Local session cookie deleted anyway")
+			http.Error(w, "Logout issue: " + err.Error() + "; Local session cookie deleted anyway", http.StatusInternalServerError)
 			return
 		}
 	}

@@ -7,8 +7,6 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
   <script src="script.js"></script>
   <link rel="stylesheet" href="style.css">
-  
-  <!-- link rel="stylesheet" href="modal.css" -->
 </head>
 
 <body>
@@ -45,6 +43,13 @@
   <textarea name="verifyMe" id="verifyMe" rows="8" cols="80"></textarea>
   <br> <button onclick="castBallot()">Cast Ballot</button>
   <br> <button onclick="castBallot(true)">Simulate covert ballot manipulation</button>
+  <br>
+  <br>
+  
+  Current Ballot Status:
+  <div>
+      <pre id="ballot_status"></pre>
+  </div>
   <br>
   <br>
   
