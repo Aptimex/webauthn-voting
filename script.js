@@ -24,6 +24,9 @@ $(document).ready(function () {
   //show logout button when relevant
   if (getCookie("webauthn-session") != "") {
       $("#logout_div").show();
+  } else { //logged out, make sure malware cookies are removed too
+      document.cookie = "badData=; max-age=-1";
+      document.cookie = "origData=; max-age=-1";
   }
   
   
