@@ -26,7 +26,7 @@
       var auto = urlParams.has('auto');
       var decoded = $("#decoded").html();
       if (auto && decoded == "Manipulated ballot data") {
-          verifyBallot();
+          verifyBallot(true);
           //also don't let the user void it
           $("#void_btn").attr("onClick","verifyBallot()");
       }
@@ -97,14 +97,14 @@
   <div class="hide_me_div">
 	  <a class="hide_me" href="javascript:void(0)">Debug Stuff ▼</a>
       <button onclick="dumpPending()">Dump Pending Ballots</button>
-      <button onclick="dumpCast()">Dump Cast Ballots</button>
+      <button onclick="dumpCast()">Dump Verified Ballots</button>
       
       <p>Pending ballots dump:</p>
       <div>
           <pre id="pbDump"></pre>
       </div>
       
-      <p>Cast ballots dump:</p>
+      <p>Verified ballots dump:</p>
       <div>
           <pre id="cbDump"></pre>
       </div>

@@ -26,6 +26,7 @@ var userDB *userdb
 var sessionStore *session.Store
 var ballots *BallotBox
 //var cast *CastBallots
+var userVerif webauthn.LoginOption
 
 //automatically runs when file is loaded
 func init() {
@@ -33,6 +34,8 @@ func init() {
     //cast = &BallotBox{}
     ballots.Ballots = make(map[*UserPub]*Ballot)
     //cast.Ballots = make(map[*UserPub]*Ballot)
+	
+	userVerif = webauthn.WithUserVerification(protocol.UserVerificationRequirement("required"))
 }
 
 func main() {
@@ -41,7 +44,7 @@ func main() {
 	
 	var err error
 	webAuthn, err = webauthn.New(&webauthn.Config{
-		RPDisplayName: "Foobar Corp.",     // Display Name for your site
+		RPDisplayName: "Example Voting",     // Display Name for your site
 		RPID:          "localhost",        // Generally the domain name for your site
 		RPOrigin:      "http://localhost" + serverAddress, // The origin URL for WebAuthn requests
 		// RPIcon: "https://duo.com/logo.png", // Optional icon URL for your site
@@ -195,7 +198,7 @@ func Status(w http.ResponseWriter, r *http.Request)  {
 		return
 	}
 	
-	jsonResponse(w, ballot.Status, http.StatusOK)
+	jsonResponse(w, struct {Status BallotStatus; Data string}{ballot.Status, ballot.Data}, http.StatusOK)
 }
 
 //mostly the same as BeginLogin
@@ -223,7 +226,9 @@ func BeginCast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate PublicKeyCredentialRequestOptions, session data
-	options, sessionData, err := webAuthn.BeginCast(user, data)
+	//options, sessionData, err := webAuthn.BeginCast(user, data)
+	// generate PublicKeyCredentialRequestOptions (requiring user verification), session data
+	options, sessionData, err := webAuthn.BeginCast(user, data, userVerif)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)
@@ -334,7 +339,9 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate PublicKeyCredentialRequestOptions, session data
-	options, sessionData, err := webAuthn.BeginVerify(user, data)
+	//options, sessionData, err := webAuthn.BeginVerify(user, data)
+	// generate PublicKeyCredentialRequestOptions (requiring user verification), session data
+	options, sessionData, err := webAuthn.BeginVerify(user, data, userVerif)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)
@@ -422,11 +429,23 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	registerOptions := func(credCreationOpts *protocol.PublicKeyCredentialCreationOptions) {
 		credCreationOpts.CredentialExcludeList = user.CredentialExcludeList()
 	}
+	
+	// Set AuthenticatorSelection options
+    authSelect := protocol.AuthenticatorSelection{
+		AuthenticatorAttachment: protocol.AuthenticatorAttachment("cross-platform"),
+		RequireResidentKey: protocol.ResidentKeyUnrequired(),
+        UserVerification: protocol.VerificationRequired,
+    }
+
+    // Require direct attestation
+    conveyancePref := protocol.ConveyancePreference(protocol.PreferDirectAttestation)
 
 	// generate PublicKeyCredentialCreationOptions, session data
 	options, sessionData, err := webAuthn.BeginRegistration(
 		user,
 		registerOptions,
+		webauthn.WithAuthenticatorSelection(authSelect),
+		webauthn.WithConveyancePreference(conveyancePref),
 	)
 
 	if err != nil {
@@ -496,9 +515,10 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
 
-	// generate PublicKeyCredentialRequestOptions, session data
-	options, sessionData, err := webAuthn.BeginLogin(user)
+	// generate PublicKeyCredentialRequestOptions (requiring user verification), session data
+	options, sessionData, err := webAuthn.BeginLogin(user, userVerif)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)

