@@ -592,7 +592,7 @@ function loginUser() {
                 }
                 
             } else {
-                window.location.href = "./vote";
+                window.location.href = "./cast";
             }
             return
         })

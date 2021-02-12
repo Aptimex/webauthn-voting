@@ -72,7 +72,7 @@ func main() {
 	r.HandleFunc("/cast/finish/{username}", FinishCast).Methods("POST")
 	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
 	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
-	r.HandleFunc("/vote", LoginRequired(CastBallotPage)).Methods("GET")
+	r.HandleFunc("/cast", LoginRequired(CastBallotPage)).Methods("GET")
 	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
 	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
 	r.HandleFunc("/status", LoginRequired(Status)).Methods("GET")
