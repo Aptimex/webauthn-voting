@@ -4,6 +4,7 @@ import (
     "fmt"
     "sync"
     "encoding/json"
+    "encoding/base64"
     "log"
     "bytes"
     //"net/http"
@@ -34,19 +35,54 @@ func (bs BallotStatus) MarshalJSON() ([]byte, error)  {
 }
 
 type Ballot struct {
+    VoterID     uint64 //matches user.id
     Data        string //the "challenge" in WebAuthn terms
     
     //sigData contains Response and Raw objects of type ParsedAssertionResponse and CredentialAssertionResponse respectively
     //Can run .Verify(storedChallenge string, relyingPartyID, relyingPartyOrigin string, verifyUser bool, credentialBytes []byte) on them
     //see webauthn/protocol/assertion.go for details
-    SigData1    *protocol.ParsedCredentialAssertionData `json:"sig1"` //initial submission
-    SigData2    *protocol.ParsedCredentialAssertionData `json:"sig2"` //verification
+    SigData1    *protocol.ParsedCredentialAssertionData `json:"castSig"` //initial submission
+    SigData2    *protocol.ParsedCredentialAssertionData `json:"verifySig"` //verification
     Status      BallotStatus
 }
 
 type BallotBox struct {
 	Ballots    map[*UserPub]*Ballot
     mu         sync.RWMutex
+}
+
+//Check that the ballot signatures are valid based on the linked user's first (only) credential
+func (b *Ballot) Verify(bb *BallotBox) (error, string) {
+    result := ""
+    var user *UserPub = nil
+    
+    for u, _ := range bb.Ballots {
+        if u.Id == b.VoterID {
+            user = u
+            break
+        }
+    }
+    if user == nil {
+        result := "Ballot isn't mapped to a registered user in the BallotBox, cannot verify\n"
+        return fmt.Errorf(result), result
+    }
+    
+    config := webAuthn.Config
+    if b.SigData1 != nil {
+        err := b.SigData1.Verify(b.Data, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+        if err != nil {return err, ""}
+        result += "1st sig valid\n"
+        
+        if b.SigData2 != nil {
+            err := b.SigData2.Verify(base64.StdEncoding.EncodeToString([]byte(b.Data))/*base64.b.SigData1.Response.CollectedClientData.Challenge*/, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+            if err != nil {return err, ""}
+            result += "2nd sig valid\n"
+        }
+    }
+    
+    
+    
+    return nil, result
 }
 
 func (bb *BallotBox) AlreadyVoted(user *UserPub) (bool, error) {
@@ -67,12 +103,6 @@ func (bb *BallotBox) AlreadyVoted(user *UserPub) (bool, error) {
             }
         }
     }
-    
-    /*
-    if b, ok := bb.Ballots[user]; ok {
-        
-    }
-    */
     
     return false, nil
 }
@@ -95,6 +125,7 @@ func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.Pa
     }
     
     bb.Ballots[user] = &Ballot{}
+    bb.Ballots[user].VoterID = user.Id
 	bb.Ballots[user].Data = data
     bb.Ballots[user].SigData1 = parsedResponse
     bb.Ballots[user].SigData2 = nil

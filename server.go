@@ -76,6 +76,7 @@ func main() {
 	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
 	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
 	r.HandleFunc("/status", LoginRequired(Status)).Methods("GET")
+	r.HandleFunc("/reverify", LoginRequired(Reverify)).Methods("GET")
 
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
@@ -199,6 +200,27 @@ func Status(w http.ResponseWriter, r *http.Request)  {
 	}
 	
 	jsonResponse(w, struct {Status BallotStatus; Data string}{ballot.Status, ballot.Data}, http.StatusOK)
+}
+
+// Same as Status() but also re-verifies the current voter's ballot signatures (if any)
+// Demonstrates that storing HSK responses enables ballot auditing after-the-fact
+func Reverify(w http.ResponseWriter, r *http.Request)  {
+	user, err := GetUser(r)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	ballot, err := ballots.GetBallot(user)
+	if err != nil { //only thrown if no ballot found
+		jsonResponse(w, err.Error(), http.StatusOK)
+		return
+	}
+	
+	err, msg := ballot.Verify(ballots)
+	
+	jsonResponse(w, struct {Status BallotStatus; Data string; Err error; Msg string}{ballot.Status, ballot.Data, err, msg}, http.StatusOK)
 }
 
 //mostly the same as BeginLogin
