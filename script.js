@@ -24,20 +24,20 @@ $(document).ready(function () {
   //show logout button when relevant
   if (getCookie("webauthn-session") != "") {
       $("#logout_div").show();
-  } else { //logged out, make sure malware cookies are removed too
+  } else { //logged out, make sure malware-emulation cookies are removed too
       document.cookie = "badData=; max-age=-1";
       document.cookie = "origData=; max-age=-1";
   }
   
   
-  //Update ballot status peridoically if relevant
+  //Update ballot status peridoically if relevant box exists
   if ($("#ballot_status").length) {
       pollStatus();
   }
 });
 
+//Polls for a ballot status update (for the logged-in user) every 5 seconds and displays it
 function pollStatus() {
-    //alert("test");
     $.get(
         '/status',
         null,
@@ -46,9 +46,7 @@ function pollStatus() {
         },
         'json'
     ).then((status) => {
-            //$("#ballot_status").html(JSON.stringify(status);
-            
-            //Spoof polled ballot data if manipulated
+            //Spoof polled ballot data if manipulated (origData cookie set)
             var origData = getCookie("origData");
             if (origData != "") {
                 status.Data = origData;
@@ -59,15 +57,16 @@ function pollStatus() {
             $("#ballot_status").html("Status: " + status.Status + "\nData: " + status.Data);
         }).catch((error) => {
           console.log(error)
-          //alert("failed to get ballot status");
+          $("#ballot_status").html("Error polling, see console");
         })
     
     setTimeout(pollStatus, 5000);
 }
 
-function dumpDB() {
+//Gets a dump of registered users
+function dumpUsers() {
     $.get(
-        '/dump',
+        '/dumpUsers',
         null,
         function (data) {
           return data
@@ -82,6 +81,7 @@ function dumpDB() {
         })
 }
 
+//Not implemented on back-end since client-side secure session cookies can't be tracked by server
 function dumpSessions() {
     $.get(
         '/dumpSessions',
@@ -92,7 +92,7 @@ function dumpSessions() {
         'json'
         ).then((dump) => {
             console.log(dump);
-            document.getElementById("sessionsDump").innerHTML = dump;//JSON.stringify(JSON.parse(dump),null,2);
+            document.getElementById("sessionsDump").innerHTML = dump;
         }).catch((error) => {
           console.log(error)
           alert("failed to dump sessions");
@@ -116,9 +116,9 @@ function dumpPending() {
         })
 }
 
-function dumpCast() {
+function dumpVerified() {
     $.get(
-        '/dumpCast',
+        '/dumpVerified',
         null,
         function (data) {
           return data
@@ -133,19 +133,7 @@ function dumpCast() {
         })
 }
 
-function castBallot(modify=false, badSign=false) {
-    return verifyData(modify, badSign);
-}
-
 function voidBallot() {
-    /*
-    username = $("#username").val()
-    if (username === "") {
-      alert("Please enter a username");
-      return;
-    }
-    */
-
     console.log("Begin Void");
     $.get(
       '/void',
@@ -159,8 +147,14 @@ function voidBallot() {
           document.getElementById("verified").innerHTML = "Ballot succesfully VOIDED:  " + response;
       })
       .catch((error) => {
+          var msg;
+          if ('responseText' in error) {
+              msg = error.responseText;
+          } else {
+              msg = error
+          }
           document.getElementById("verified").style.color = "red";
-          document.getElementById("verified").innerHTML = "Issue voiding ballot:  " + error.responseText;
+          document.getElementById("verified").innerHTML = "Issue voiding ballot:  " + msg;
         console.log(error)
       })
 }
@@ -284,8 +278,14 @@ function verifyBallot(relogin=false) {
               return data;
           })
           .catch((error) => {
+              var msg;
+              if ('responseText' in error) {
+                  msg = error.responseText;
+              } else {
+                  msg = error
+              }
               document.getElementById("verified").style.color = "red";
-              document.getElementById("verified").innerHTML = "Ballot verification failed: " + error.responseText;
+              document.getElementById("verified").innerHTML = "Ballot verification failed: " + msg;
               //console.log(error.responseText)
               console.log(error)
               //alert("failed to verify data for " + username)
@@ -293,8 +293,14 @@ function verifyBallot(relogin=false) {
           
       })
       .catch((error) => {
+          var msg;
+          if ('responseText' in error) {
+              msg = error.responseText;
+          } else {
+              msg = error
+          }
           document.getElementById("verified").style.color = "red";
-          document.getElementById("verified").innerHTML = "Ballot verification failed:  " + error.responseText
+          document.getElementById("verified").innerHTML = "Ballot verification failed:  " + msg;
         console.log(error)
       })
 }
@@ -319,7 +325,7 @@ function confirmData(challengeString) {
 }
 
 // mostly the same as loginUser
-function verifyData(modify=false, badSign=false) {
+function castBallot(modify=false, badSign=false) {
   var badData = "Manipulated ballot data";
   //save to cookie so verification on other pages can be manipulated too
   if (modify) {
@@ -407,7 +413,7 @@ function verifyData(modify=false, badSign=false) {
         function (data) {
             //console.log("Finish login data:");
             //console.log(data);
-            return data
+            return data;
         },
         'json')
         .then((data) => {
@@ -420,24 +426,29 @@ function verifyData(modify=false, badSign=false) {
             return data;
         })
         .catch((error) => {
+            var msg;
+            if ('responseText' in error) {
+                msg = error.responseText;
+            } else {
+                msg = error
+            }
             document.getElementById("verified").style.color = "red";
-            document.getElementById("verified").innerHTML = "Ballot cast failed: " + error.responseText;
+            document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg;
             //console.log(error.responseText)
-            console.log(error)
-            //alert("failed to verify data for " + username)
+            console.log(error);
         })
         
     })
-    /* Pretty sure this is in the wrong spot; triggers even if /verify/finish fails
-    .then((success) => {
-        alert("Data verified for " + username + "!")
-        return
-    })
-    */
     .catch((error) => {
+        var msg;
+        if ('responseText' in error) {
+            msg = error.responseText;
+        } else {
+            msg = error
+        }
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Ballot cast failed: " + error //Probably user canceled, or other client-side issue";
-      console.log(error)
+        document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg; //Probably user canceled, or other client-side issue";
+      console.log(error);
       //alert("failed to verify data for " + username)
     })
 }

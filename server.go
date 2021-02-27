@@ -2,18 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	//"time"
 	"fmt"
 	"log"
 	"net/http"
 	"html/template"
 	"strings"
-	//"io"
 	"context"
-	//"time"
-	//"io/ioutil"
-    //"bytes"
-	//b64 "encoding/base64"
 
 	"github.com/duo-labs/webauthn.io/session"
 	"github.com/duo-labs/webauthn/protocol"
@@ -24,16 +18,15 @@ import (
 var webAuthn *webauthn.WebAuthn
 var userDB *userdb
 var sessionStore *session.Store
+
 var ballots *BallotBox
-//var cast *CastBallots
 var userVerif webauthn.LoginOption
 
-//automatically runs when file is loaded
+//Initialize important voting structures and settings
+//Automatically runs when file is loaded at runtime
 func init() {
     ballots = &BallotBox{}
-    //cast = &BallotBox{}
     ballots.Ballots = make(map[*UserPub]*Ballot)
-    //cast.Ballots = make(map[*UserPub]*Ballot)
 	
 	userVerif = webauthn.WithUserVerification(protocol.UserVerificationRequirement("required"))
 }
@@ -62,69 +55,88 @@ func main() {
 	}
 
 	r := mux.NewRouter()
-
-	r.HandleFunc("/dump", dbDump).Methods("GET")
-	r.HandleFunc("/dumpSessions", DumpSessions).Methods("GET")
-	r.HandleFunc("/dumpPending", DumpPending).Methods("GET")
-	r.HandleFunc("/dumpCast", DumpCast).Methods("GET")
-	r.HandleFunc("/logout", Logout).Methods("GET")
-	r.HandleFunc("/cast/begin/{username}", BeginCast).Methods("POST")
-	r.HandleFunc("/cast/finish/{username}", FinishCast).Methods("POST")
-	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
-	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
-	r.HandleFunc("/cast", LoginRequired(CastBallotPage)).Methods("GET")
-	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
-	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
-	r.HandleFunc("/status", LoginRequired(Status)).Methods("GET")
-	r.HandleFunc("/reverify", LoginRequired(Reverify)).Methods("GET")
-
+	
+	//Standard WebAuthn Implementations
 	r.HandleFunc("/register/begin/{username}", BeginRegistration).Methods("GET")
 	r.HandleFunc("/register/finish/{username}", FinishRegistration).Methods("POST")
 	r.HandleFunc("/login/begin/{username}", BeginLogin).Methods("GET")
 	r.HandleFunc("/login/finish/{username}", FinishLogin).Methods("POST")
 
+	//Page handlers
+	//r.PathPrefix("/").Handler(http.FileServer(http.Dir("./")))
+	//r.HandleFunc("/", HomePage).Methods("GET")
+	r.HandleFunc("/cast", LoginRequired(CastBallotPage)).Methods("GET")
+	r.HandleFunc("/verify", LoginRequired(VerifyBallotPage)).Methods("GET")
+	r.HandleFunc("/logout", Logout).Methods("GET")
+
+	//Implementations of paper concepts
+	r.HandleFunc("/cast/begin/{username}", BeginCast).Methods("POST")
+	r.HandleFunc("/cast/finish/{username}", FinishCast).Methods("POST")
+	r.HandleFunc("/verify/begin/{username}", BeginVerify).Methods("POST")
+	r.HandleFunc("/verify/finish/{username}", FinishVerify).Methods("POST")
+	r.HandleFunc("/void", LoginRequired(VoidBallot)).Methods("GET")
+	r.HandleFunc("/status", LoginRequired(Status)).Methods("GET")
+
+	//Debug additions
+	r.HandleFunc("/dumpUsers", userDump).Methods("GET")
+	r.HandleFunc("/dumpSessions", DumpSessions).Methods("GET")
+	r.HandleFunc("/dumpPending", DumpPending).Methods("GET")
+	r.HandleFunc("/dumpVerified", dumpVerified).Methods("GET")
+	r.HandleFunc("/reverify", LoginRequired(Reverify)).Methods("GET")
+	
+	//Home page server
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./")))
+
 
 	log.Println("starting server at", serverAddress)
 	log.Fatal(http.ListenAndServe(serverAddress, r))
 }
 
-func dbDump(w http.ResponseWriter, r *http.Request) {
+//Returns all the data associated with registered users for debugging
+func userDump(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
 	data := userDB.DumpDB()
 	jsonResponse(w, data, http.StatusOK)
 }
 
+//Not implemented on back-end since client-side secure session cookies can't be tracked by server
 func DumpSessions(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%+v\n", userDB.users)
-	data := "Not implemented yet"
+	data := "Not implemented."
 	jsonResponse(w, data, http.StatusOK)
 }
 
+//Returns all ballots with a "pending" status
 func DumpPending(w http.ResponseWriter, r *http.Request) {
-	//log.Printf("%+v\n", userDB.users)
 	data := ballots.DumpPending()
-	log.Println(data)
+	//log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
-func DumpCast(w http.ResponseWriter, r *http.Request) {
-	//log.Printf("%+v\n", userDB.users)
-	data := ballots.DumpCast()
-	log.Println(data)
+//Returns all ballots with a "verified" status
+func dumpVerified(w http.ResponseWriter, r *http.Request) {
+	data := ballots.dumpVerified()
+	//log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
+//Returns all ballots with an "error" or "void" status
 func DumpError(w http.ResponseWriter, r *http.Request) {
-	//log.Printf("%+v\n", userDB.users)
 	data := ballots.DumpError()
-	log.Println(data)
+	//log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
+//Serve the homepage (registration and login)
+func HomePage(w http.ResponseWriter, r *http.Request)  {
+	tmpl, _ := template.ParseFiles("index.html")
+	tmpl.Execute(w, nil)
+}
+
+//Serve the Cast page
+//Wrap this handler in the LoginRequired() hanlder
+//In a real implememntation this should only be accessible from a non-mobile user-agent
 func CastBallotPage(w http.ResponseWriter, r *http.Request)  {
-	//wrap this handler in the LoginRequired() hanlder
-	
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
 	if err != nil {
 		log.Println(err)
@@ -132,7 +144,7 @@ func CastBallotPage(w http.ResponseWriter, r *http.Request)  {
 		return
 	}
 	
-	//retrieve the user from the session info
+	//retrieve the user from the session info, diplay the username
 	user, err := userDB.GetUserByID(session.GetUserID())
 	if err != nil {
 		errorResponse(w, err.Error(), http.StatusBadRequest)
@@ -144,9 +156,10 @@ func CastBallotPage(w http.ResponseWriter, r *http.Request)  {
 	tmpl.Execute(w, struct {Username string}{username})
 }
 
+//Serve the Verify page
+//Wrap this handler in the LoginRequired() hanlder
+//In a real implememntation this should only be accessible from an approved smartphone app
 func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
-	//wrap this handler in the LoginRequired() hanlder
-	
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
 	if err != nil {
 		log.Println(err)
@@ -154,7 +167,7 @@ func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
 		return
 	}
 	
-	//retrieve the user from the session info
+	//retrieve the user from the session info, diplay the username
 	user, err := userDB.GetUserByID(session.GetUserID())
 	if err != nil {
 		errorResponse(w, err.Error(), http.StatusBadRequest)
@@ -162,48 +175,44 @@ func VerifyBallotPage(w http.ResponseWriter, r *http.Request)  {
 	}
 	username := user.name
 	
-	//Retrieve the store ballot data to verify
+	//Retrieve the user's stored ballot data to verify
+	//This should check the ballot status and display an error if it was alread verified,
+	// but since the server won't let you re-verify a ballot this is good enough for
+	// demonstration purposes.
 	pending, err := ballots.GetBallot(user)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
-	/* Ballot status added to page, so can still display it even if verified/voided/etc
-	if pending.Status != BS_PENDING {
-		status, _ := json.Marshal(pending.Status)
-		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
-		log.Println(err)
-		jsonResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	*/
 	pendingData := pending.Data
 	
 	tmpl, err := template.ParseFiles("voteVerify.html")
 	tmpl.Execute(w, struct {Username string; BallotData string}{username, pendingData})
 }
 
+//Return status information for the ballot associated with the logged-in user
+//Wrap this handler in the LoginRequired() hanlder
 func Status(w http.ResponseWriter, r *http.Request)  {
 	user, err := GetUser(r)
 	if err != nil {
 		log.Println(err)
-		jsonResponse(w, err.Error(), http.StatusBadRequest)
+		jsonResponse(w, struct {Status string; Data string}{err.Error(), ""}, http.StatusBadRequest)
 		return
 	}
 	
 	ballot, err := ballots.GetBallot(user)
 	if err != nil { //only thrown if no ballot found
-		jsonResponse(w, err.Error(), http.StatusOK)
+		jsonResponse(w, struct {Status string; Data string}{err.Error(), ""}, http.StatusOK)
 		return
 	}
 	
 	jsonResponse(w, struct {Status BallotStatus; Data string}{ballot.Status, ballot.Data}, http.StatusOK)
 }
 
-// Same as Status() but also re-verifies the current voter's ballot signatures (if any)
-// Demonstrates that storing HSK responses enables ballot auditing after-the-fact
+//Same as Status() but also re-verifies the current voter's ballot signatures (if any)
+//Demonstrates that storing full HSK responses enables ballot signature auditing after-the-fact
+//Wrap this handler in the LoginRequired() hanlder
 func Reverify(w http.ResponseWriter, r *http.Request)  {
 	user, err := GetUser(r)
 	if err != nil {
@@ -223,7 +232,11 @@ func Reverify(w http.ResponseWriter, r *http.Request)  {
 	jsonResponse(w, struct {Status BallotStatus; Data string; Err error; Msg string}{ballot.Status, ballot.Data, err, msg}, http.StatusOK)
 }
 
-//mostly the same as BeginLogin
+//Same as the BeginLogin handler for authentication, but sets the body contents as the Challenge
+// instead of generating a random challenge
+//This should retrieve the user from the included session token, but doing so via a supplied
+// username instead demonstrates that even a spoofed session can't be used to cast a ballot
+// without the correct HSK (but will display the ballot data)
 func BeginCast(w http.ResponseWriter, r *http.Request) {
 
 	// get username
@@ -246,10 +259,16 @@ func BeginCast(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	//See if cast ballot already exists;
+	// err will only be set iff no ballot found for this user, so no need to handle errors
+	ballot, _ := ballots.GetBallot(user)
+	if ballot != nil { //ballot found
+		errorResponse(w, "Ballot already cast for user " + username, http.StatusInternalServerError)
+		return
+	}
 
-	// generate PublicKeyCredentialRequestOptions, session data
-	//options, sessionData, err := webAuthn.BeginCast(user, data)
-	// generate PublicKeyCredentialRequestOptions (requiring user verification), session data
+	//Same as webAuth.BeginLogin, but passes the challenge as 'data'
 	options, sessionData, err := webAuthn.BeginCast(user, data, userVerif)
 	if err != nil {
 		log.Println(err)
@@ -268,7 +287,11 @@ func BeginCast(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, options, http.StatusOK)
 }
 
-//mostly the same as FinishLogin
+//Same as the FinishLogin handler for authentication, but also stores the ballot data
+// and HSK response after verifying its validity.
+//This should retrieve the user from the included session token, but doing so via a supplied
+// username instead demonstrates that even a spoofed session can't be used to cast a ballot
+// without the correct HSK (but will display the ballot data)
 func FinishCast(w http.ResponseWriter, r *http.Request) {
 	// get username
 	vars := mux.Vars(r)
@@ -292,7 +315,8 @@ func FinishCast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-
+	//Same as webAuth.FinishLogin, but returns the verified data and HSK response so
+	// they can be stored in the ballot structure
 	_, veriData, parsedResponse, err := webAuthn.FinishCast(user, sessionData, r)
 	if err != nil {
 		log.Println(err)
@@ -300,6 +324,7 @@ func FinishCast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	//Construct a ballot from the verified data
 	err = ballots.AddBallot(user, veriData, parsedResponse)
 	if err != nil {
 		log.Println(err)
@@ -307,13 +332,16 @@ func FinishCast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	
 	jsonResponse(w, veriData, http.StatusOK)
 }
 
-//Verify cast ballot in separate session
+//Similar to BeginCast; the body should contain the base64 encoding of the original ballot data
+// (which was sent to the client when the Verify page was loaded). This checks that it matches
+// the data in a pending ballot for this user and then uses it as the challenge in the response
+//This should retrieve the user from the included session token, but doing so via a supplied
+// username instead demonstrates that even a spoofed session can't be used to verify a ballot
+// without the correct HSK (but will display the ballot data)
 func BeginVerify(w http.ResponseWriter, r *http.Request) {
-	
 	// get username
 	vars := mux.Vars(r)
 	username := vars["username"]
@@ -335,7 +363,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	//Compare to previous ballot data
+	//Get the stored ballot for this user
 	pending, err := ballots.GetBallot(user)
 	if err != nil {
 		log.Println(err)
@@ -343,6 +371,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	//Make sure the stored ballot is pending
 	if pending.Status != BS_PENDING {
 		status, _ := json.Marshal(pending.Status)
 		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
@@ -353,6 +382,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	
 	pendingData := pending.Data
 	
+	//Compare data in request to stored ballot data, make sure it matches
 	if data != pendingData {
 		err = fmt.Errorf("Verification data does not match pending data: \nvData: " + data + "\npData: " + pendingData)
 		log.Println(err)
@@ -360,9 +390,7 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// generate PublicKeyCredentialRequestOptions, session data
-	//options, sessionData, err := webAuthn.BeginVerify(user, data)
-	// generate PublicKeyCredentialRequestOptions (requiring user verification), session data
+	//Same as webAuth.BeginLogin, but passes the challenge as 'data'
 	options, sessionData, err := webAuthn.BeginVerify(user, data, userVerif)
 	if err != nil {
 		log.Println(err)
@@ -381,7 +409,10 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, options, http.StatusOK)
 }
 
-//Verify cast ballot in separate session
+//Similar to FinishCast; adds the validated HSK response to the ballot struct
+//This should retrieve the user from the included session token, but doing so via a supplied
+// username instead demonstrates that even a spoofed session can't be used to verify a ballot
+// without the correct HSK (but will display the ballot data)
 func FinishVerify(w http.ResponseWriter, r *http.Request) {
 	// get username
 	vars := mux.Vars(r)
@@ -405,10 +436,9 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-
-	//Data match was performed in the BeginVerify function
-	//This just makes sure it's a valid sig on that data
-	log.Println("Verifying sig")
+	
+	//webAuthn.FinishVerify() does exactly the same thing as webAuth.FinishCast(),
+	// just named differently to be consistent with these libraries' conventions
 	_, veriData, parsedResponse, err := webAuthn.FinishVerify(user, sessionData, r)
 	if err != nil {
 		log.Println(err)
@@ -417,7 +447,6 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	//store the second sig and mark as verified
-	log.Println("Verifying ballot")
 	err = ballots.VerifyBallot(user, veriData, parsedResponse)
 	if err != nil {
 		log.Println(err)
@@ -425,10 +454,10 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	
 	jsonResponse(w, veriData, http.StatusOK)
 }
 
+//Standard WebAuthn Registration implementation
 func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// get username/friendly name
@@ -487,6 +516,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, options, http.StatusOK)
 }
 
+//Standard WebAuthn Registration implementation
 func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// get username
@@ -522,6 +552,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, "Registration Success", http.StatusOK)
 }
 
+//Standard WebAuthn Authentication implementation
 func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// get username
@@ -558,6 +589,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, options, http.StatusOK)
 }
 
+//Standard WebAuthn Authentication implementation
 func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	// get username
@@ -608,7 +640,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, "", http.StatusOK)
 }
 
-//modified from webauthn.io source code
+//Modified from webauthn.io source code to work with this implementation
 // LoginRequired sets a context variable with the user loaded from the user ID
 // stored in the session cookie
 func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
@@ -647,6 +679,7 @@ func LoginRequired(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+//Basic session logout functionality- just deletes session cookies.
 func Logout(w http.ResponseWriter, r *http.Request)  {
 	username, err := GetUsername(r)
 	if err != nil {
@@ -670,6 +703,9 @@ func Logout(w http.ResponseWriter, r *http.Request)  {
 	tmpl.Execute(w, struct {Username string}{username})
 }
 
+//Processes a request to void a pending ballot.
+//Does not require HSK signagure, but should be wrapped in the LoginRequired() hanlder
+// so that only a logged-in user can do so. Will fail anyway if no valid session is provided.
 func VoidBallot(w http.ResponseWriter, r *http.Request)  {
 	user, err := GetUser(r)
 	if err != nil {
@@ -688,7 +724,7 @@ func VoidBallot(w http.ResponseWriter, r *http.Request)  {
 	jsonResponse(w, "Ballot voided for user " + user.name, http.StatusOK)
 }
 
-//Returns the current user's username based on cookies in the request
+//Returns the current user's User struct based on session cookies in the request
 func GetUser(r *http.Request) (*User, error)  {
 	session, err := sessionStore.GetWebauthnSession("authentication", r)
 	if err != nil {
@@ -712,23 +748,10 @@ func GetUsername(r *http.Request) (string, error)  {
 		return "", err
 	}
 	
-	/*
-	session, err := sessionStore.GetWebauthnSession("authentication", r)
-	if err != nil {
-		log.Println("GetUsername: error retrieving session: " + err.Error())
-		return "", err
-	}
-	
-	//retrieve the user from the session info
-	user, err := userDB.GetUserByID(session.GetUserID())
-	if err != nil {
-		log.Println("GetUsername: error retrieving user: " + err.Error())
-		return "", err
-	}
-	*/
 	return user.name, nil
 }
 
+//Convenience wrapper for sending JSON-encoded responses
 // from: https://github.com/duo-labs/webauthn.io/blob/3f03b482d21476f6b9fb82b2bf1458ff61a61d41/server/response.go#L15
 func jsonResponse(w http.ResponseWriter, d interface{}, c int) {
 	dj, err := json.Marshal(d)
@@ -740,6 +763,7 @@ func jsonResponse(w http.ResponseWriter, d interface{}, c int) {
 	fmt.Fprintf(w, "%s", dj)
 }
 
+//Convenience wrapper for sending back error responses (without JSON encoding, for raw display)
 func errorResponse(w http.ResponseWriter, d interface{}, c int) {
 	w.WriteHeader(c)
 	fmt.Fprintf(w, "%s", d)
