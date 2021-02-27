@@ -21,6 +21,7 @@ type User struct {
 	credentials []webauthn.Credential
 }
 
+// Same as the User struct, but all the fields are public for JSON-marshalling
 type UserPub struct {
 	Id          uint64
 	Name        string
@@ -28,7 +29,7 @@ type UserPub struct {
 	Credentials []webauthn.Credential `json:"creds"`
 }
 
-//JSON and other method can't interact with non-public fields
+//JSON and other library methods can't interact with non-public fields, so this makes a usable copy
 func (u User) ToPub() UserPub {
 	var p UserPub
 	p.Id = u.id
@@ -38,12 +39,13 @@ func (u User) ToPub() UserPub {
 	return p
 }
 
+//Same as ToPub but returns a pointer to the struct instead of the struct itself
 func (u User) ToPubPtr() *UserPub {
 	tmp := u.ToPub()
 	return &tmp
 }
 
-
+//Converts a public struct back to private one
 func (u UserPub) ToPriv() User {
 	var p User
 	p.id = u.Id
@@ -53,21 +55,24 @@ func (u UserPub) ToPriv() User {
 	return p
 }
 
+//Converts a public struct back to private one and returns a pointer to it
+//This will be a COPY of the original User struct; the pointer will NOT be equivalent to the original User.
 func (u UserPub) ToPrivPtr() *User {
 	tmp := u.ToPriv()
 	return &tmp
 }
 
+//Makes a private User struct Marshal-able into JSON
 func (u User) json() string {
 	tmp, err := json.Marshal(u.ToPub())
 	if err != nil {
 		fmt.Println(err)
-		return "CRAP"
+		return "ERROR" //make sure errors are obvious
 	}
 	return string(tmp)
-	
 }
 
+//Debugging function that prints a User struct in human-redable format
 func (u User) Print() string {
 	result := ""
 	result += "id: " + strconv.FormatUint(u.id, 10) + "\n"
@@ -79,9 +84,8 @@ func (u User) Print() string {
 		result += "[ID: " + base64.StdEncoding.EncodeToString(v.ID) + ", \n"
 		result += "PubKey: " + base64.StdEncoding.EncodeToString(v.PublicKey) + ", \n"
 		result += "Attestation Type: " + v.AttestationType + "]"
-		//Ignore Authenticator struct for now
+		//Ignore Authenticator struct for now, not really needed for debugging
 	}
-	//result += "\n"
 	return result
 }
 

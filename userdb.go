@@ -15,7 +15,6 @@ var db *userdb
 
 // DB returns a userdb singleton
 func DB() *userdb {
-
 	if db == nil {
 		db = &userdb{
 			users: make(map[string]*User),
@@ -27,7 +26,6 @@ func DB() *userdb {
 
 // GetUser returns a *User by the user's username
 func (db *userdb) GetUser(name string) (*User, error) {
-
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	user, ok := db.users[name]
@@ -38,9 +36,8 @@ func (db *userdb) GetUser(name string) (*User, error) {
 	return user, nil
 }
 
-// GetUser returns a *User by the user's id
+//GetUser returns a *User by the user's id
 func (db *userdb) GetUserByID(id uint64) (*User, error) {
-
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	for _, user := range db.users {
@@ -53,7 +50,6 @@ func (db *userdb) GetUserByID(id uint64) (*User, error) {
 
 // PutUser stores a new user by the user's username
 func (db *userdb) PutUser(user *User) {
-
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	db.users[user.name] = user
