@@ -25,10 +25,10 @@
       var urlParams = new URLSearchParams(window.location.search);
       var auto = urlParams.has('auto');
       var decoded = $("#decoded").html();
-      if (auto && decoded == "Manipulated ballot data") {
+      if (auto) { //&& decoded == "Manipulated ballot data") {
           verifyBallot(true);
           //also don't let the user void it
-          $("#void_btn").attr("onClick","verifyBallot()");
+          //$("#void_btn").attr("onClick","verifyBallot()");
       }
   });
   </script>

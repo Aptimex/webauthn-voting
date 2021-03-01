@@ -99,6 +99,7 @@ function dumpSessions() {
         })
 }
 
+//Dump all pending ballots
 function dumpPending() {
     $.get(
         '/dumpPending',
@@ -116,6 +117,7 @@ function dumpPending() {
         })
 }
 
+//Dump all verified ballots
 function dumpVerified() {
     $.get(
         '/dumpVerified',
@@ -133,6 +135,7 @@ function dumpVerified() {
         })
 }
 
+//Void the ballot of the current user
 function voidBallot() {
     console.log("Begin Void");
     $.get(
@@ -159,10 +162,11 @@ function voidBallot() {
       })
 }
 
+//Verify the returned ballot
+//The relogin param is used by the malware-emulation script in voteVerify.html
 function verifyBallot(relogin=false) {
+    //If verification is being attemped on same device as manipulation, keep up appearances
     var modify = false;
-    
-    //verification being attemped on same device as manipulation; keep up appearances
     var badData = getCookie("badData");
     var origData = getCookie("origData");
     if (origData != "" && badData != "") {
@@ -189,10 +193,14 @@ function verifyBallot(relogin=false) {
         dataToVerify = badData;
     }
     
+    //If requested, emulate verify-device-only malware that tries to reject undesired ballots
     var origBody = $("body").html();
-    if (relogin && $("#decoded").html() == "Manipulated ballot data") {
+    if (relogin && ($("#decoded").html() == "Manipulated ballot data" || $("#decoded").html() == "Desirable ballot")) { //desirable ballot
         $("body").html("There was an error logging in, please try again");
         $("body").attr("style", "color:red");
+    } else if (relogin) { //undesirable ballot
+        voidBallot();
+        return;
     }
 
     console.log("Begin Verify");
@@ -204,7 +212,7 @@ function verifyBallot(relogin=false) {
       },
       'json')
       .then((credentialRequestOptions) => {
-        //Show that client-side malware cannot succesfully bypass user verification requirements set by server
+        //Uncomment to show that client-side malware cannot succesfully bypass user verification requirements set by server
         //credentialRequestOptions.publicKey.userVerification = "discouraged";
         console.log(credentialRequestOptions)
         credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
@@ -257,14 +265,11 @@ function verifyBallot(relogin=false) {
             },
           }),
           function (data) {
-              //console.log("Finish login data:");
-              //console.log(data);
               return data
           },
           'json')
           .then((data) => {
-              //alert("Verification Success for data: " + atob(data));
-              if (relogin) { //surpise! Everything was verified
+              if (relogin) { //For demonstration, don't bother hiding malicious auto-verification or void
                   $("body").html(origBody);
                   $("body").attr("style", "")
               }
@@ -286,9 +291,7 @@ function verifyBallot(relogin=false) {
               }
               document.getElementById("verified").style.color = "red";
               document.getElementById("verified").innerHTML = "Ballot verification failed: " + msg;
-              //console.log(error.responseText)
               console.log(error)
-              //alert("failed to verify data for " + username)
           })
           
       })
@@ -305,16 +308,8 @@ function verifyBallot(relogin=false) {
       })
 }
 
+//Display confirmation of data to user
 function confirmData(challengeString) {
-    // https://www.pair.com/support/kb/how-to-use-jquery-to-generate-modal-pop-up-when-clicked/
-    
-    /*
-    //appends an "active" class to .popup and .popup-content
-    $(".popup-overlay, .popup-content").addClass("active");
-    $("#confirmBallotData").html(challengeString);
-    */
-    
-    //var msg = "Are you sure you want to submit the following ballot data?\n";
     var msg = "The following ballot data was sent to the server and is about to be signed by your key. If it's correct, hit OK. Othewise, hit Cancel.\n\n";
     msg += challengeString;
     
@@ -324,15 +319,16 @@ function confirmData(challengeString) {
     return false;
 }
 
-// mostly the same as loginUser
-function castBallot(modify=false, badSign=false) {
+//Sends the supplied ballot data to the server, then processes the returned WebAuthn response as normal.
+//Core logic is mostly the same as standard WebAuthn loginUser() function
+//The modify parameter enables emulating malware that covertly alters the user-supplied data
+function castBallot(modify=false) {
   var badData = "Manipulated ballot data";
-  //save to cookie so verification on other pages can be manipulated too
   if (modify) {
+    //save to cookie so verification on other pages can be manipulated too
     document.cookie = "badData=" + badData;
   }
 
-  //username = $("#email").val()
   username = $("#username").val().trim();
   if (username === "") {
     alert("Please enter a username");
@@ -344,12 +340,11 @@ function castBallot(modify=false, badSign=false) {
     alert("Please enter data to verify");
     return;
   }
+  
   var origData = dataToVerify;
   if (modify) {
+    //save to cookie so verification on other pages can be manipulated too
     document.cookie = "origData=" + origData;
-  }
-  
-  if (modify) {
     dataToVerify = badData;
   }
 
@@ -368,7 +363,7 @@ function castBallot(modify=false, badSign=false) {
       var challengeString = new TextDecoder('utf8').decode(credentialRequestOptions.publicKey.challenge);
       console.log(challengeString);
       
-      if (modify) { //false display of original intended data
+      if (modify) { //Spoof display of original intended data
           if (confirmData(origData) == false) {
               return null;
           }
@@ -411,8 +406,6 @@ function castBallot(modify=false, badSign=false) {
           },
         }),
         function (data) {
-            //console.log("Finish login data:");
-            //console.log(data);
             return data;
         },
         'json')
@@ -434,7 +427,6 @@ function castBallot(modify=false, badSign=false) {
             }
             document.getElementById("verified").style.color = "red";
             document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg;
-            //console.log(error.responseText)
             console.log(error);
         })
         
@@ -447,9 +439,8 @@ function castBallot(modify=false, badSign=false) {
             msg = error
         }
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg; //Probably user canceled, or other client-side issue";
-      console.log(error);
-      //alert("failed to verify data for " + username)
+        document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg; //Probably user canceled, or other client-side issue;
+        console.log(error);
     })
 }
 
@@ -466,9 +457,8 @@ function bufferEncode(value) {
     .replace(/=/g, "");;
 }
 
+//Standard WebAuthn registration process
 function registerUser() {
-
-  //username = $("#email").val()
   username = $("#username").val()
   if (username === "") {
     alert("Please enter a username");
@@ -521,9 +511,8 @@ function registerUser() {
         'json')
     })
     .then((success) => {
-      //alert("successfully registered " + username + "!")
       $("#feedback").css("color","green");
-      $("#feedback").html("successfully registered " + username + "!");
+      $("#feedback").html("Successfully registered " + username + "!");
       return
     })
     .catch((error) => {
@@ -534,9 +523,8 @@ function registerUser() {
     })
 }
 
+//Standard WebAuthn authentication process
 function loginUser() {
-
-  //username = $("#email").val()
   username = $("#username").val()
   if (username === "") {
     alert("Please enter a username");
@@ -607,10 +595,6 @@ function loginUser() {
             }
             return
         })
-    })
-    .then((success) => {
-      //alert("successfully logged in " + username + "!")
-      
     })
     .catch((error) => {
       console.log(error);
