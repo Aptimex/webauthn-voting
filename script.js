@@ -205,7 +205,7 @@ function verifyBallot(relogin=false) {
 
     console.log("Begin Verify");
     $.post(
-      '/verify/begin/' + username,
+      '/verify/begin',
       JSON.stringify(dataToVerify),
       function (data) {
         return data
@@ -252,7 +252,7 @@ function verifyBallot(relogin=false) {
         console.log("Finish Verify");
         var veriData = "";
         $.post(
-          '/verify/finish/' + username,
+          '/verify/finish',
           JSON.stringify({
             id: assertion.id,
             rawId: bufferEncode(rawId),
@@ -350,7 +350,7 @@ function castBallot(modify=false) {
 
   console.log("Begin Cast");
   $.post(
-    '/cast/begin/' + username,
+    '/cast/begin',
     JSON.stringify(dataToVerify),
     function (data) {
       return data
@@ -393,7 +393,7 @@ function castBallot(modify=false) {
       console.log("Finish Cast");
       var veriData = "";
       $.post(
-        '/cast/finish/' + username,
+        '/cast/finish',
         JSON.stringify({
           id: assertion.id,
           rawId: bufferEncode(rawId),

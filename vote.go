@@ -5,43 +5,33 @@ import (
     "encoding/json"
     "log"
     "fmt"
-    
-    "github.com/gorilla/mux"
 )
 
 //Same as the BeginLogin handler for authentication, but sets the body contents as the Challenge
 // instead of generating a random challenge
-//This should retrieve the user from the included session token, but doing so via a supplied
-// username instead demonstrates that even a spoofed session can't be used to cast a ballot
-// without the correct HSK (but will display the ballot data)
 func BeginCast(w http.ResponseWriter, r *http.Request) {
-
-	// get username
-	vars := mux.Vars(r)
-	username := vars["username"]
-	
-	var data string
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		log.Println(err)
-		jsonResponse(w, err.Error(), http.StatusBadRequest)
-	}
-
-	// get user
-	user, err := userDB.GetUser(username)
-
-	// user doesn't exist
+    user, err := GetUser(r)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	
+	var data string
+	err = json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
+	}
+    if data == "" {
+        jsonResponse(w, "Ballot data is empty, cannot cast", http.StatusBadRequest)
+    }
+	
 	//See if cast ballot already exists;
 	// err will only be set iff no ballot found for this user, so no need to handle errors
 	ballot, _ := ballots.GetBallot(user)
 	if ballot != nil { //ballot found
-		errorResponse(w, "Ballot already cast for user " + username, http.StatusInternalServerError)
+		errorResponse(w, "Ballot already cast for user " + user.name, http.StatusInternalServerError)
 		return
 	}
 
@@ -66,18 +56,8 @@ func BeginCast(w http.ResponseWriter, r *http.Request) {
 
 //Same as the FinishLogin handler for authentication, but also stores the ballot data
 // and HSK response after verifying its validity.
-//This should retrieve the user from the included session token, but doing so via a supplied
-// username instead demonstrates that even a spoofed session can't be used to cast a ballot
-// without the correct HSK (but will display the ballot data)
 func FinishCast(w http.ResponseWriter, r *http.Request) {
-	// get username
-	vars := mux.Vars(r)
-	username := vars["username"]
-
-	// get user
-	user, err := userDB.GetUser(username)
-
-	// user doesn't exist
+    user, err := GetUser(r)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
@@ -115,29 +95,19 @@ func FinishCast(w http.ResponseWriter, r *http.Request) {
 //Similar to BeginCast; the body should contain the base64 encoding of the original ballot data
 // (which was sent to the client when the Verify page was loaded). This checks that it matches
 // the data in a pending ballot for this user and then uses it as the challenge in the response
-//This should retrieve the user from the included session token, but doing so via a supplied
-// username instead demonstrates that even a spoofed session can't be used to verify a ballot
-// without the correct HSK (but will display the ballot data)
 func BeginVerify(w http.ResponseWriter, r *http.Request) {
-	// get username
-	vars := mux.Vars(r)
-	username := vars["username"]
-	
-	var data string
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		log.Println(err)
-		jsonResponse(w, err.Error(), http.StatusBadRequest)
-	}
-
-	// get user
-	user, err := userDB.GetUser(username)
-
-	// user doesn't exist
+    user, err := GetUser(r)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	
+	var data string
+	err = json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		log.Println(err)
+		jsonResponse(w, err.Error(), http.StatusBadRequest)
 	}
 	
 	//Get the stored ballot for this user
@@ -188,18 +158,8 @@ func BeginVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 //Similar to FinishCast; adds the validated HSK response to the ballot struct
-//This should retrieve the user from the included session token, but doing so via a supplied
-// username instead demonstrates that even a spoofed session can't be used to verify a ballot
-// without the correct HSK (but will display the ballot data)
 func FinishVerify(w http.ResponseWriter, r *http.Request) {
-	// get username
-	vars := mux.Vars(r)
-	username := vars["username"]
-
-	// get user
-	user, err := userDB.GetUser(username)
-
-	// user doesn't exist
+    user, err := GetUser(r)
 	if err != nil {
 		log.Println(err)
 		jsonResponse(w, err.Error(), http.StatusBadRequest)
