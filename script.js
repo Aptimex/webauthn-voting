@@ -51,7 +51,8 @@ function pollStatus() {
             if (origData != "") {
                 status.Data = origData;
             } else {
-                status.Data = atob(status.Data);
+                //status.Data = atob(status.Data);
+                status.Data = status.Data;
             }
             
             $("#ballot_status").html("Status: " + status.Status + "\nData: " + status.Data);
@@ -276,9 +277,11 @@ function verifyBallot(relogin=false) {
               
               document.getElementById("verified").style.color = "green";
               if (modify) {
-                  document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(origData);
+                  //document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(origData);
+                  document.getElementById("verified").innerHTML = "Ballot Verified!\n" + origData;
               } else {
-                  document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
+                  //document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
+                  document.getElementById("verified").innerHTML = "Ballot verified!\n" + data;
               }
               return data;
           })
@@ -311,7 +314,9 @@ function verifyBallot(relogin=false) {
 //Display confirmation of data to user
 function confirmData(challengeString) {
     var msg = "The following ballot data was sent to the server and is about to be signed by your key. If it's correct, hit OK. Othewise, hit Cancel.\n\n";
-    msg += challengeString;
+    var extractedData = challengeString.split("\0")[0]; //separate the data from the random challenge
+    //msg += challengeString;
+    msg += extractedData;
     
     if (confirm(msg)) {
         return true;
@@ -329,11 +334,13 @@ function castBallot(modify=false) {
     document.cookie = "badData=" + badData;
   }
 
+  /*
   username = $("#username").val().trim();
   if (username === "") {
     alert("Please enter a username");
     return;
   }
+  */
   
   var dataToVerify = $("#verifyMe").val().trim();
   if (dataToVerify === "") {
@@ -414,7 +421,8 @@ function castBallot(modify=false) {
             if (modify) {
                 document.getElementById("verified").innerHTML = "Ballot Cast!\n" + origData;
             } else {
-                document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
+                //document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
+                document.getElementById("verified").innerHTML = "Ballot Cast!\n" + data;
             }
             return data;
         })

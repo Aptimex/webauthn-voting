@@ -86,16 +86,55 @@ func (b *Ballot) Verify(bb *BallotBox) (error, string) {
         return fmt.Errorf(result), result
     }
     
+    data := b.Data
+    
     config := webAuthn.Config
     if b.SigData1 != nil {
-        err := b.SigData1.Verify(b.Data, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+        challenge1 := b.SigData1.Response.CollectedClientData.Challenge
+        tmp, err := base64.RawURLEncoding.DecodeString(challenge1)
+        if err != nil {
+            return err, result + err.Error()
+        }
+        
+        //Make sure challenge1 data matches ballot data
+        data1 := string(bytes.Split(tmp, []byte{0})[0]) //extract the data from the challenge
+        if data != data1 {
+            result += "Data and data1 don't match: " + data + "; " + data1 + " \n"
+            return fmt.Errorf(result), result
+        }
+        
+        //Data check was performed above; passing duplicate challenge1 is fine, just need to check the signature
+        err = b.SigData1.Verify(challenge1, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
         if err != nil {return err, ""}
         result += "1st sig valid\n"
         
+        //Only check SigData2 stuff if SigData1 checked out
         if b.SigData2 != nil {
-            err := b.SigData2.Verify(base64.StdEncoding.EncodeToString([]byte(b.Data)), config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+            challenge2 := b.SigData2.Response.CollectedClientData.Challenge
+            
+            //Detect replay attacks
+            if challenge1 == challenge2 {
+                result += "Both challenges are identtical; VERY likely a replay attack\n"
+                return fmt.Errorf(result), result
+            }
+            
+            tmp, err = base64.RawURLEncoding.DecodeString(challenge2)
+            if err != nil {
+                return err, result + err.Error()
+            }
+            
+            //Make sure challenge2 data matches ballot data
+            data2 := string(bytes.Split(tmp, []byte{0})[0])
+            if data != data2 {
+                result += "Data and data2 don't match: " + data + "; " + data2 + " \n"
+                return fmt.Errorf(result), result
+            }
+            //Data check was performed above; passing duplicate challenge2 is fine, just need to check the signature
+            err := b.SigData2.Verify(challenge2, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
             if err != nil {return err, ""}
             result += "2nd sig valid\n"
+            
+            
         }
     }
     
@@ -126,7 +165,7 @@ func (bb *BallotBox) AlreadyVoted(user *UserPub) (bool, error) {
 }
 
 //Creates a ballot from data submited by a user on the /cast page and stores it in the box
-//Ballot info should be validated before this is called, since this just blindly stores whatever it's given
+//SigData2 should have been validated by WebAuthn protocols before this is called; this just blindly stores whatever it's given
 func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
     user := u.ToPubPtr()
     
@@ -155,7 +194,9 @@ func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.Pa
 }
 
 //Adds verification data (from the /verify page) to an existing ballot
-//Ballot info should be validated before this is called; this only checks that the target ballot has a Pending status
+//SigData2 should have been validated by WebAuthn protocols before this is called
+//This will call Verify() perform a full re-verification of the entire ballot;
+// if anything is amiss, verification will fail with a descriptive error msg
 func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
     if bb == nil {
         return fmt.Errorf("Ballot Box not initialized")
@@ -187,8 +228,17 @@ func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol
 	defer bb.mu.Unlock()
     
     bb.Ballots[user].SigData2 = parsedResponse
-    bb.Ballots[user].Status = BS_VERIFIED
     
+    err, msg := bb.Ballots[user].Verify(bb)
+    if err != nil {
+        //Revert verification data if comprehensive check fails
+        bb.Ballots[user].SigData2 = nil
+        
+        err = fmt.Errorf("Unable to validate completed ballot: " + msg + "\n")
+        return err
+    }
+    
+    bb.Ballots[user].Status = BS_VERIFIED
     return nil
 }
 

@@ -92,9 +92,9 @@ func FinishCast(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, veriData, http.StatusOK)
 }
 
-//Similar to BeginCast; the body should contain the base64 encoding of the original ballot data
-// (which was sent to the client when the Verify page was loaded). This checks that it matches
-// the data in a pending ballot for this user and then uses it as the challenge in the response
+//Similar to BeginCast; the body should contain the original ballot data (which was sent to the
+// client when the Verify page was loaded). This checks that it matches the data in a pending
+// ballot for this user and then uses it to generate a challenge response
 func BeginVerify(w http.ResponseWriter, r *http.Request) {
     user, err := GetUser(r)
 	if err != nil {
@@ -184,7 +184,7 @@ func FinishVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	//store the second sig and mark as verified
+	//store the second sig, validate the entire ballot, and mark as verified
 	err = ballots.VerifyBallot(user, veriData, parsedResponse)
 	if err != nil {
 		log.Println(err)
