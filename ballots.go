@@ -23,14 +23,14 @@ type BallotBox struct {
 //Contains the ballot contents (data) plus metadata to enable proper recording and auditing
 type Ballot struct {
     VoterID     uint64 //matches user.id
-    Data        string //the "challenge" in WebAuthn terms
+    Data        string //the submitted ballot contents
+    Status      BallotStatus
     
-    //sigData contains Response and Raw objects of type ParsedAssertionResponse and CredentialAssertionResponse, respectively
+    //sigDataX contains Response and Raw objects of type ParsedAssertionResponse and CredentialAssertionResponse, respectively
     //Can re-run .Verify(storedChallenge string, relyingPartyID, relyingPartyOrigin string, verifyUser bool, credentialBytes []byte) method on them
     //see webauthn/protocol/assertion.go for details
-    SigData1    *protocol.ParsedCredentialAssertionData `json:"castSig"` //initial submission
-    SigData2    *protocol.ParsedCredentialAssertionData `json:"verifySig"` //verification
-    Status      BallotStatus
+    CastSig    *protocol.ParsedCredentialAssertionData //`json:"castSig"` //initial submission
+    VerifySig    *protocol.ParsedCredentialAssertionData //`json:"verifySig"` //verification
 }
 
 //Allows explicitely marking ballot status for convenience;
@@ -45,10 +45,10 @@ const (
 
 //Mapping for BallotStatus to be JSON-marshaled into readable strings
 var BStoString = map[BallotStatus]string {
-    BS_ERROR: "Ballot Error",
+    BS_ERROR: "Error",
     BS_PENDING: "Pending",
     BS_VERIFIED: "Verified",
-    BS_VOID: "Ballot Voided",
+    BS_VOID: "Voided",
 }
 
 //Allow BallotStatus to be JSON-marshaled into readable strings
@@ -89,8 +89,8 @@ func (b *Ballot) Verify(bb *BallotBox) (error, string) {
     data := b.Data
     
     config := webAuthn.Config
-    if b.SigData1 != nil {
-        challenge1 := b.SigData1.Response.CollectedClientData.Challenge
+    if b.CastSig != nil {
+        challenge1 := b.CastSig.Response.CollectedClientData.Challenge
         tmp, err := base64.RawURLEncoding.DecodeString(challenge1)
         if err != nil {
             return err, result + err.Error()
@@ -104,13 +104,13 @@ func (b *Ballot) Verify(bb *BallotBox) (error, string) {
         }
         
         //Data check was performed above; passing duplicate challenge1 is fine, just need to check the signature
-        err = b.SigData1.Verify(challenge1, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+        err = b.CastSig.Verify(challenge1, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
         if err != nil {return err, ""}
         result += "1st sig valid\n"
         
-        //Only check SigData2 stuff if SigData1 checked out
-        if b.SigData2 != nil {
-            challenge2 := b.SigData2.Response.CollectedClientData.Challenge
+        //Only check VerifySig stuff if CastSig checked out
+        if b.VerifySig != nil {
+            challenge2 := b.VerifySig.Response.CollectedClientData.Challenge
             
             //Detect replay attacks
             if challenge1 == challenge2 {
@@ -130,7 +130,7 @@ func (b *Ballot) Verify(bb *BallotBox) (error, string) {
                 return fmt.Errorf(result), result
             }
             //Data check was performed above; passing duplicate challenge2 is fine, just need to check the signature
-            err := b.SigData2.Verify(challenge2, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
+            err := b.VerifySig.Verify(challenge2, config.RPID, config.RPOrigin, true, user.Credentials[0].PublicKey)
             if err != nil {return err, ""}
             result += "2nd sig valid\n"
             
@@ -165,7 +165,7 @@ func (bb *BallotBox) AlreadyVoted(user *UserPub) (bool, error) {
 }
 
 //Creates a ballot from data submited by a user on the /cast page and stores it in the box
-//SigData2 should have been validated by WebAuthn protocols before this is called; this just blindly stores whatever it's given
+//VerifySig should have been validated by WebAuthn protocols before this is called; this just blindly stores whatever it's given
 func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
     user := u.ToPubPtr()
     
@@ -186,15 +186,15 @@ func (bb *BallotBox) AddBallot(u *User, data string, parsedResponse *protocol.Pa
     bb.Ballots[user] = &Ballot{}
     bb.Ballots[user].VoterID = user.Id
 	bb.Ballots[user].Data = data
-    bb.Ballots[user].SigData1 = parsedResponse
-    bb.Ballots[user].SigData2 = nil
+    bb.Ballots[user].CastSig = parsedResponse
+    bb.Ballots[user].VerifySig = nil
     bb.Ballots[user].Status = BS_PENDING
     
     return nil
 }
 
 //Adds verification data (from the /verify page) to an existing ballot
-//SigData2 should have been validated by WebAuthn protocols before this is called
+//VerifySig should have been validated by WebAuthn protocols before this is called
 //This will call Verify() perform a full re-verification of the entire ballot;
 // if anything is amiss, verification will fail with a descriptive error msg
 func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol.ParsedCredentialAssertionData) (err error)  {
@@ -218,7 +218,7 @@ func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol
 		err = fmt.Errorf("Ballot does not have Pending status, cannot be Verified. Status: " + string(status))
 		return err
 	}
-    if pending.SigData2 != nil { //make sure the Pending status is consistent with ballot contents
+    if pending.VerifySig != nil { //make sure the Pending status is consistent with ballot contents
         err = fmt.Errorf("Ballot is marked as Pending, but already contains verification data.")
 		return err
         //in reality this should be flagged for review since it should never happen
@@ -227,12 +227,12 @@ func (bb *BallotBox) VerifyBallot(u *User, data string, parsedResponse *protocol
     bb.mu.Lock()
 	defer bb.mu.Unlock()
     
-    bb.Ballots[user].SigData2 = parsedResponse
+    bb.Ballots[user].VerifySig = parsedResponse
     
     err, msg := bb.Ballots[user].Verify(bb)
     if err != nil {
         //Revert verification data if comprehensive check fails
-        bb.Ballots[user].SigData2 = nil
+        bb.Ballots[user].VerifySig = nil
         
         err = fmt.Errorf("Unable to validate completed ballot: " + msg + "\n")
         return err
@@ -275,7 +275,7 @@ func (bb *BallotBox) VoidBallot(u *User) (err error)  {
     if b.Status == BS_VERIFIED {
         return fmt.Errorf("Cannot void, ballot is already verified")
     }
-    if b.SigData1 != nil && b.SigData2 != nil { //catch any verified ballots that didn't get properly marked
+    if b.CastSig != nil && b.VerifySig != nil { //catch any verified ballots that didn't get properly marked
         return fmt.Errorf("Ballot status is " + BStoString[b.Status] + ", but contains verification data. Cannot void.")
         //in reality this should be flagged for review since it should never happen
     }
