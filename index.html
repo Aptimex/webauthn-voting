@@ -10,33 +10,19 @@
 </head>
 
 <body>
-    <h1>Registration and Login</h1>
+    <h1>Home (Registration and Login)</h1>
     
     <div id="logout_div" style="display:none;"><button type="button" name="logout_btn" onClick='location.href="./logout"'>Logout</button> </div>
-    <br>
-    <br>
-    
-    <div class="hide_me_div">
-  	<a class="hide_me" href="javascript:void(0)">Page Info ▼</a>
-      
-      <p>This page provides a Register button for convenience. In reality, registration of voters' security keys should be performed securely prior to the availability of electronic ballot submissions. Attacks at the registration stage are outside the scope of this project. For simplicity this uses a passwordless authentication scheme, but using both (password and security key together; 2FA) is probably a better apprach in a real system.</p>
-      <p>"Username" can be in any form the server is set up to handle. In a voting scheme where voter privacy needs to be maintained, this could be a random numeric code (chosen from a pool). The username (and an associated random registration password) could be digitally marked as "avaiable" at the time of voter regiration, but not digitally linked to the voter's identity. This would allow the voter to register their key to that username, ensure only validated voters can register keys, and preserve voter privacy. </p>
-      <p>The Login button will (after a standard webauthn login process) redirect to the voting page. If a pending ballot for the voter is already in the system, it will instead redirect to the Verification page for convenience.</p>
-      <p>If the GET parameter "?auto" is appended to this URL when the page is loaded, then a succesful login that redirects to the Verification page will emulate a worst-case malware-emulation attempt to trick the voter into auto-verifying their ballot if it consists of the string "Manipulated ballot data". If their ballot contains anything else than nothing unusual will happen.</p>
-      <p>It is assumed that in the event of a discovered manipulation, detected error, or just due to a change in mind at any time prior to the close of Internet voting that the registered voter can opt to use a traditional voting method instead, such as is currently available in many places with provisional ballots for cases when there is an issue with an absentee ballot. In this case a poll worker should be able to witness the voter succesfully logging in with their username and security key (on a known-good machine) as conclusive evidence that they are the owner of a particular ballot, and can proceeed with the alternative voting process. Exactly how an election authority decides to track and avoid counting such digital ballots that were already valid and verified is mostly a matter of policy, and has not been implemented here. But the voiding process for a verified ballot must require the digital signature of the associated HSK. </p>
-      <p>Debug functionality at the bottom allows the various internal databases to be viewed to show things are working as intended.</p>
-      
-    </div>
     <br>
     <br>
 
   Username:
   <br>
-  <input type="text" name="username" id="username" placeholder="i.e. foo@bar.com">
+  <input type="text" name="username" id="username" placeholder="username">
   <br>
   <br>
   
-  [Errors and Feedback]
+  [Feedback and Errors]
   <div id="feedback">
       
   </div>
@@ -76,14 +62,10 @@
         <pre id="dbDump"></pre>
     </div>
     
-    <p>Voter sessions dump:</p>
-    <div>
-        <pre id="sessionsDump"></pre>
-    </div>
-    
     
     <button onclick="dumpPending()">Dump Pending Ballots</button>
     <button onclick="dumpVerified()">Dump Verified Ballots</button>
+    <button onclick="dumpVoid()">Dump Void Ballots</button>
     
     <p>Pending ballots dump:</p>
     <div>
@@ -92,7 +74,12 @@
     
     <p>Verified ballots dump:</p>
     <div>
-        <pre id="cbDump"></pre>
+        <pre id="vbDump"></pre>
+    </div>
+    
+    <p>Void ballots dump:</p>
+    <div>
+        <pre id="voidDump"></pre>
     </div>
 </div>
 

@@ -79,7 +79,8 @@ func main() {
 	r.HandleFunc("/dumpUsers", userDump).Methods("GET")
 	r.HandleFunc("/dumpSessions", DumpSessions).Methods("GET")
 	r.HandleFunc("/dumpPending", DumpPending).Methods("GET")
-	r.HandleFunc("/dumpVerified", dumpVerified).Methods("GET")
+	r.HandleFunc("/dumpVerified", DumpVerified).Methods("GET")
+	r.HandleFunc("/dumpVoid", DumpVoid).Methods("GET")
 	
 	//Home page server; this must be defined last as the catch-all
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./")))

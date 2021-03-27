@@ -26,15 +26,15 @@ func DumpPending(w http.ResponseWriter, r *http.Request) {
 }
 
 //Returns all ballots with a "verified" status
-func dumpVerified(w http.ResponseWriter, r *http.Request) {
-	data := ballots.dumpVerified()
+func DumpVerified(w http.ResponseWriter, r *http.Request) {
+	data := ballots.DumpVerified()
 	//log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }
 
 //Returns all ballots with an "error" or "void" status
-func DumpError(w http.ResponseWriter, r *http.Request) {
-	data := ballots.DumpError()
+func DumpVoid(w http.ResponseWriter, r *http.Request) {
+	data := ballots.DumpVoid()
 	//log.Println(data)
 	jsonResponse(w, data, http.StatusOK)
 }

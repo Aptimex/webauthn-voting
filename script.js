@@ -51,7 +51,6 @@ function pollStatus() {
             if (origData != "") {
                 status.Data = origData;
             } else {
-                //status.Data = atob(status.Data);
                 status.Data = status.Data;
             }
             
@@ -111,7 +110,7 @@ function dumpPending() {
         'json'
         ).then((dump) => {
             console.log(dump);
-            document.getElementById("pbDump").innerHTML = dump; //JSON.stringify(JSON.parse(dump),null,2);
+            document.getElementById("pbDump").innerHTML = dump;
         }).catch((error) => {
           console.log(error)
           alert("failed to dump Pending ballots");
@@ -129,10 +128,28 @@ function dumpVerified() {
         'json'
         ).then((dump) => {
             console.log(dump);
-            document.getElementById("cbDump").innerHTML = dump; //JSON.stringify(JSON.parse(dump),null,2);
+            document.getElementById("vbDump").innerHTML = dump;
         }).catch((error) => {
           console.log(error)
-          alert("failed to dump Cast ballots");
+          alert("failed to dump Verified ballots");
+        })
+}
+
+//Dump all void ballots
+function dumpVoid() {
+    $.get(
+        '/dumpVoid',
+        null,
+        function (data) {
+          return data
+        },
+        'json'
+        ).then((dump) => {
+            console.log(dump);
+            document.getElementById("voidDump").innerHTML = dump;
+        }).catch((error) => {
+          console.log(error)
+          alert("failed to dump Void ballots");
         })
 }
 
@@ -172,10 +189,6 @@ function verifyBallot(relogin=false) {
     var origData = getCookie("origData");
     if (origData != "" && badData != "") {
         modify = true;
-        
-        //need them in base64 for this stage
-        badData = btoa(badData).replace("=", ""); //backend uses/expects no padding
-        origData = btoa(origData).replace("=", "");
     }
     
     username = $("#username").val().trim();
@@ -194,12 +207,12 @@ function verifyBallot(relogin=false) {
         dataToVerify = badData;
     }
     
-    //If requested, emulate verify-device-only malware that tries to reject undesired ballots
+    //If requested, emulate an auto-verify-or-void attack
     var origBody = $("body").html();
-    if (relogin && ($("#decoded").html() == "Manipulated ballot data" || $("#decoded").html() == "Desirable ballot")) { //desirable ballot
+    if (relogin && (modify || $("#verifyMe").html() == "Manipulated ballot data" || $("#verifyMe").html() == "Desirable ballot")) {
         $("body").html("There was an error logging in, please try again");
         $("body").attr("style", "color:red");
-    } else if (relogin) { //undesirable ballot
+    } else if (relogin) { //undesirable ballot, void it
         voidBallot();
         return;
     }
@@ -227,7 +240,7 @@ function verifyBallot(relogin=false) {
             if (confirmData(origData) == false) {
                 return null;
             }
-        } else {
+        } else { //default behavior, show the voter what they're signing
             if (confirmData(challengeString) == false) {
                 return null;
             }
@@ -270,17 +283,15 @@ function verifyBallot(relogin=false) {
           },
           'json')
           .then((data) => {
-              if (relogin) { //For demonstration, don't bother hiding malicious auto-verification or void
+              if (relogin) { //For demonstration; don't bother hiding malicious auto-verification or void
                   $("body").html(origBody);
                   $("body").attr("style", "")
               }
               
               document.getElementById("verified").style.color = "green";
               if (modify) {
-                  //document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(origData);
                   document.getElementById("verified").innerHTML = "Ballot Verified!\n" + origData;
               } else {
-                  //document.getElementById("verified").innerHTML = "Ballot verified!\n" + atob(data);
                   document.getElementById("verified").innerHTML = "Ballot verified!\n" + data;
               }
               return data;
@@ -315,7 +326,6 @@ function verifyBallot(relogin=false) {
 function confirmData(challengeString) {
     var msg = "The following ballot data was sent to the server and is about to be signed by your key. If it's correct, hit OK. Othewise, hit Cancel.\n\n";
     var extractedData = challengeString.split("\0")[0]; //separate the data from the random challenge
-    //msg += challengeString;
     msg += extractedData;
     
     if (confirm(msg)) {
@@ -333,14 +343,6 @@ function castBallot(modify=false) {
     //save to cookie so verification on other pages can be manipulated too
     document.cookie = "badData=" + badData;
   }
-
-  /*
-  username = $("#username").val().trim();
-  if (username === "") {
-    alert("Please enter a username");
-    return;
-  }
-  */
   
   var dataToVerify = $("#verifyMe").val().trim();
   if (dataToVerify === "") {
@@ -374,7 +376,7 @@ function castBallot(modify=false) {
           if (confirmData(origData) == false) {
               return null;
           }
-      } else {
+      } else { //default behavior, show the voter what they're signing
           if (confirmData(challengeString) == false) {
               return null;
           }
@@ -421,7 +423,6 @@ function castBallot(modify=false) {
             if (modify) {
                 document.getElementById("verified").innerHTML = "Ballot Cast!\n" + origData;
             } else {
-                //document.getElementById("verified").innerHTML = "Ballot Cast!\n" + atob(data);
                 document.getElementById("verified").innerHTML = "Ballot Cast!\n" + data;
             }
             return data;
@@ -447,7 +448,7 @@ function castBallot(modify=false) {
             msg = error
         }
         document.getElementById("verified").style.color = "red";
-        document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg; //Probably user canceled, or other client-side issue;
+        document.getElementById("verified").innerHTML = "Ballot cast failed: " + msg; //Probably user canceled
         console.log(error);
     })
 }
@@ -610,6 +611,7 @@ function loginUser() {
     })
 }
 
+//Convenience function to get a cookie value if it exists
 //https://stackoverflow.com/questions/10730362/get-cookie-by-name
 function getCookie(name) {
   const value = `; ${document.cookie}`;

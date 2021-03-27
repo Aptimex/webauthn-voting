@@ -329,7 +329,7 @@ func (bb *BallotBox) DumpPending() (string) {
 }
 
 //Dump verified ballots as json
-func (bb *BallotBox) dumpVerified() (string) {
+func (bb *BallotBox) DumpVerified() (string) {
 	result := "{"
 	for u, b := range bb.Ballots {
         if b.Status == BS_VERIFIED {
@@ -348,7 +348,7 @@ func (bb *BallotBox) dumpVerified() (string) {
 }
 
 //Dump voided and erroneous ballots as json
-func (bb *BallotBox) DumpError() (string) {
+func (bb *BallotBox) DumpVoid() (string) {
 	result := "{"
 	for u, b := range bb.Ballots {
         if b.Status == BS_ERROR || b.Status == BS_VOID {
