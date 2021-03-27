@@ -1,4 +1,4 @@
-module github.com/Aptimex/webauthn_dual
+module github.com/Aptimex/webauthn-voting
 
 go 1.12
 
